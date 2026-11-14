@@ -1,0 +1,34 @@
+{
+  "identifier" : "YadahLocalStore",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "YADAHREMOVEADS001",
+      "localizations" : [
+        {
+          "description" : "Remove ads and unlock Pro themes, custom verses, and up to 5 reminders.",
+          "displayName" : "Remove Ads Pro",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.christianappempire.yadah.removeads",
+      "referenceName" : "Remove Ads Pro",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "Z96AAJY9NG"
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

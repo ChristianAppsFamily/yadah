@@ -1,0 +1,14 @@
+import Foundation
+
+nonisolated struct UserProfile: Codable, Sendable {
+    var name: String
+    var city: String
+    var state: String
+    var initials: String {
+        let parts = name.split(separator: " ")
+        if parts.count >= 2 {
+            return String(parts[0].prefix(1) + parts[1].prefix(1)).uppercased()
+        }
+        return String(name.prefix(2)).uppercased()
+    }
+}
