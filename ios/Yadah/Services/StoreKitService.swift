@@ -1,75 +1,117 @@
 import Foundation
 import StoreKit
 
+struct EntitlementState: Equatable {
+    var hasRemovedAds = false
+    var isPro = false
+}
+
 @Observable
 @MainActor
 final class StoreKitService {
-    private(set) var product: Product?
+    private(set) var removeAdsProduct: Product?
+    private(set) var monthlyProduct: Product?
+    private(set) var yearlyProduct: Product?
     private(set) var isPurchasing = false
     private(set) var lastErrorMessage: String?
     private var updatesTask: Task<Void, Never>?
 
-    var displayPrice: String {
-        product?.displayPrice ?? AppConstants.removeAdsFallbackPrice
+    var removeAdsDisplayPrice: String {
+        removeAdsProduct?.displayPrice ?? AppConstants.removeAdsFallbackPrice
+    }
+
+    var monthlyDisplayPrice: String {
+        monthlyProduct?.displayPrice ?? AppConstants.proMonthlyFallbackPrice
+    }
+
+    var yearlyDisplayPrice: String {
+        yearlyProduct?.displayPrice ?? AppConstants.proYearlyFallbackPrice
     }
 
     func start() {
         updatesTask?.cancel()
         updatesTask = Task { await listenForTransactions() }
         Task { await loadProducts() }
-        Task { await refreshEntitlements() }
+        Task { _ = await refreshEntitlements() }
     }
 
     func loadProducts() async {
         do {
-            let products = try await Product.products(for: [AppConstants.removeAdsProductID])
-            product = products.first
+            let products = try await Product.products(for: AppConstants.allProductIDs)
+            removeAdsProduct = products.first { $0.id == AppConstants.removeAdsProductID }
+            monthlyProduct = products.first { $0.id == AppConstants.proMonthlyProductID }
+            yearlyProduct = products.first { $0.id == AppConstants.proYearlyProductID }
         } catch {
             lastErrorMessage = "Unable to load products."
         }
     }
 
-    func purchase() async -> Bool {
-        guard let product else {
-            await loadProducts()
-            guard let product else {
-                lastErrorMessage = "Product unavailable. Try again later."
-                return false
-            }
-            return await purchase(product)
-        }
-        return await purchase(product)
+    func purchaseRemoveAds() async -> Bool {
+        await purchase(product: removeAdsProduct, productID: AppConstants.removeAdsProductID)
     }
 
-    func restore() async -> Bool {
+    func purchaseMonthly() async -> Bool {
+        await purchase(product: monthlyProduct, productID: AppConstants.proMonthlyProductID)
+    }
+
+    func purchaseYearly() async -> Bool {
+        await purchase(product: yearlyProduct, productID: AppConstants.proYearlyProductID)
+    }
+
+    func restore() async -> EntitlementState {
         do {
             try await AppStore.sync()
             return await refreshEntitlements()
         } catch {
             lastErrorMessage = "Unable to restore purchases."
-            return false
+            return EntitlementState()
         }
     }
 
     @discardableResult
-    func refreshEntitlements() async -> Bool {
-        var owned = false
+    func refreshEntitlements() async -> EntitlementState {
+        var state = EntitlementState()
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
-            if transaction.productID == AppConstants.removeAdsProductID {
-                owned = true
+            switch transaction.productID {
+            case AppConstants.removeAdsProductID:
+                state.hasRemovedAds = true
+            case AppConstants.proMonthlyProductID, AppConstants.proYearlyProductID:
+                state.isPro = true
+                state.hasRemovedAds = true
+            default:
                 break
             }
         }
-        return owned
+        return state
     }
 
-    private func purchase(_ product: Product) async -> Bool {
+    private func purchase(product: Product?, productID: String) async -> Bool {
+        var resolved = product
+        if resolved == nil {
+            await loadProducts()
+            switch productID {
+            case AppConstants.removeAdsProductID:
+                resolved = removeAdsProduct
+            case AppConstants.proMonthlyProductID:
+                resolved = monthlyProduct
+            case AppConstants.proYearlyProductID:
+                resolved = yearlyProduct
+            default:
+                resolved = nil
+            }
+        }
+
+        guard let resolved else {
+            lastErrorMessage = "Product unavailable. Try again later."
+            return false
+        }
+
         isPurchasing = true
         defer { isPurchasing = false }
 
         do {
-            let result = try await product.purchase()
+            let result = try await resolved.purchase()
             switch result {
             case .success(let verification):
                 guard case .verified(let transaction) = verification else {

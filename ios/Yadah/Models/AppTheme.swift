@@ -2,23 +2,33 @@ import SwiftUI
 
 nonisolated enum AppThemeOption: String, CaseIterable, Codable, Sendable, Identifiable {
     case sky
+    case day
     case deepNavy
     case warmGold
-    case softCream
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .sky: return "Sky"
+        case .day: return "Day"
         case .deepNavy: return "Deep Navy"
         case .warmGold: return "Warm Gold"
-        case .softCream: return "Soft Cream"
         }
     }
 
     var isProOnly: Bool {
-        self != .sky
+        switch self {
+        case .sky, .day: return false
+        case .deepNavy, .warmGold: return true
+        }
+    }
+
+    var prefersLightColorScheme: Bool {
+        switch self {
+        case .sky, .day, .warmGold: return true
+        case .deepNavy: return false
+        }
     }
 
     var palette: ThemePalette {
@@ -26,30 +36,50 @@ nonisolated enum AppThemeOption: String, CaseIterable, Codable, Sendable, Identi
         case .sky:
             return ThemePalette(
                 navy: Color(red: 0.09, green: 0.20, blue: 0.35),
-                accent: Color(red: 0.58, green: 0.83, blue: 0.94),
-                accentDark: Color(red: 0.42, green: 0.72, blue: 0.87),
-                accentLight: Color(red: 0.68, green: 0.88, blue: 0.96),
-                warmGray: Color(red: 0.55, green: 0.55, blue: 0.55),
-                lightBorder: Color(red: 0.91, green: 0.93, blue: 0.95),
-                background: .white,
+                accent: Color(red: 0.42, green: 0.68, blue: 0.86),
+                accentDark: Color(red: 0.28, green: 0.52, blue: 0.72),
+                accentLight: Color(red: 0.62, green: 0.82, blue: 0.94),
+                warmGray: Color(red: 0.42, green: 0.48, blue: 0.55),
+                lightBorder: Color(red: 0.88, green: 0.91, blue: 0.94),
+                background: Color(red: 0.98, green: 0.99, blue: 1.0),
                 momentTop: Color(red: 0.58, green: 0.83, blue: 0.94),
                 momentMid: Color(red: 0.45, green: 0.73, blue: 0.89),
                 momentBottom: Color(red: 0.35, green: 0.62, blue: 0.82),
-                splashBackground: Color(red: 0.05, green: 0.12, blue: 0.22)
+                splashBackground: Color(red: 0.05, green: 0.12, blue: 0.22),
+                tabSelected: Color(red: 0.09, green: 0.20, blue: 0.35),
+                tabUnselected: Color(red: 0.45, green: 0.55, blue: 0.65)
+            )
+        case .day:
+            return ThemePalette(
+                navy: Color(red: 0.30, green: 0.24, blue: 0.20),
+                accent: Color(red: 0.85, green: 0.68, blue: 0.58),
+                accentDark: Color(red: 0.72, green: 0.52, blue: 0.42),
+                accentLight: Color(red: 0.94, green: 0.82, blue: 0.74),
+                warmGray: Color(red: 0.52, green: 0.46, blue: 0.42),
+                lightBorder: Color(red: 0.90, green: 0.86, blue: 0.82),
+                background: Color(red: 0.99, green: 0.97, blue: 0.94),
+                momentTop: Color(red: 0.94, green: 0.82, blue: 0.74),
+                momentMid: Color(red: 0.85, green: 0.68, blue: 0.58),
+                momentBottom: Color(red: 0.72, green: 0.52, blue: 0.42),
+                splashBackground: Color(red: 0.25, green: 0.18, blue: 0.14),
+                tabSelected: Color(red: 0.30, green: 0.24, blue: 0.20),
+                tabUnselected: Color(red: 0.62, green: 0.55, blue: 0.48)
             )
         case .deepNavy:
             return ThemePalette(
                 navy: Color(red: 0.92, green: 0.94, blue: 0.97),
-                accent: Color(red: 0.35, green: 0.55, blue: 0.85),
-                accentDark: Color(red: 0.25, green: 0.42, blue: 0.72),
-                accentLight: Color(red: 0.45, green: 0.62, blue: 0.90),
+                accent: Color(red: 0.45, green: 0.68, blue: 0.92),
+                accentDark: Color(red: 0.32, green: 0.52, blue: 0.78),
+                accentLight: Color(red: 0.55, green: 0.72, blue: 0.92),
                 warmGray: Color(red: 0.70, green: 0.74, blue: 0.80),
                 lightBorder: Color(red: 0.20, green: 0.28, blue: 0.40),
                 background: Color(red: 0.07, green: 0.12, blue: 0.22),
                 momentTop: Color(red: 0.12, green: 0.22, blue: 0.40),
                 momentMid: Color(red: 0.10, green: 0.18, blue: 0.34),
                 momentBottom: Color(red: 0.06, green: 0.10, blue: 0.20),
-                splashBackground: Color(red: 0.05, green: 0.08, blue: 0.16)
+                splashBackground: Color(red: 0.05, green: 0.08, blue: 0.16),
+                tabSelected: Color(red: 0.92, green: 0.94, blue: 0.97),
+                tabUnselected: Color(red: 0.55, green: 0.62, blue: 0.72)
             )
         case .warmGold:
             return ThemePalette(
@@ -63,21 +93,9 @@ nonisolated enum AppThemeOption: String, CaseIterable, Codable, Sendable, Identi
                 momentTop: Color(red: 0.90, green: 0.72, blue: 0.35),
                 momentMid: Color(red: 0.78, green: 0.58, blue: 0.22),
                 momentBottom: Color(red: 0.62, green: 0.42, blue: 0.15),
-                splashBackground: Color(red: 0.18, green: 0.12, blue: 0.05)
-            )
-        case .softCream:
-            return ThemePalette(
-                navy: Color(red: 0.30, green: 0.24, blue: 0.20),
-                accent: Color(red: 0.85, green: 0.68, blue: 0.58),
-                accentDark: Color(red: 0.72, green: 0.52, blue: 0.42),
-                accentLight: Color(red: 0.94, green: 0.82, blue: 0.74),
-                warmGray: Color(red: 0.58, green: 0.52, blue: 0.48),
-                lightBorder: Color(red: 0.90, green: 0.86, blue: 0.82),
-                background: Color(red: 0.98, green: 0.95, blue: 0.91),
-                momentTop: Color(red: 0.94, green: 0.82, blue: 0.74),
-                momentMid: Color(red: 0.85, green: 0.68, blue: 0.58),
-                momentBottom: Color(red: 0.72, green: 0.52, blue: 0.42),
-                splashBackground: Color(red: 0.25, green: 0.18, blue: 0.14)
+                splashBackground: Color(red: 0.18, green: 0.12, blue: 0.05),
+                tabSelected: Color(red: 0.28, green: 0.18, blue: 0.08),
+                tabUnselected: Color(red: 0.62, green: 0.52, blue: 0.38)
             )
         }
     }
@@ -95,6 +113,8 @@ struct ThemePalette {
     let momentMid: Color
     let momentBottom: Color
     let splashBackground: Color
+    let tabSelected: Color
+    let tabUnselected: Color
 
     var skyGradient: LinearGradient {
         LinearGradient(colors: [accentLight, accent], startPoint: .leading, endPoint: .trailing)

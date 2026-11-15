@@ -7,16 +7,24 @@ nonisolated struct ReminderTime: Identifiable, Codable, Sendable, Hashable {
     let name: String
     var isEnabled: Bool
 
+    var asDate: Date {
+        var components = DateComponents()
+        components.year = 2001
+        components.month = 1
+        components.day = 1
+        components.hour = hour
+        components.minute = minute
+        return Calendar.current.date(from: components) ?? Date()
+    }
+
     var displayTime: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
-        var components = DateComponents()
-        components.hour = hour
-        components.minute = minute
-        guard let date = Calendar.current.date(from: components) else { return "" }
-        return formatter.string(from: date)
+        return formatter.string(from: asDate)
     }
+}
 
+extension ReminderTime {
     /// Free tier starts with one reminder enabled; Pro can enable up to five.
     static let defaults: [ReminderTime] = [
         ReminderTime(id: "morning", hour: 7, minute: 0, name: "Morning Awakening", isEnabled: true),

@@ -17,14 +17,14 @@ struct VerseLibraryView: View {
                     }
                     .padding(.top, 20)
 
-                    ForEach(ScriptureTheme.allCases, id: \.self) { themeItem in
+                    ForEach(ScriptureTestament.allCases, id: \.self) { testament in
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(themeItem.rawValue)
+                            Text(testament.rawValue)
                                 .font(.system(.headline, design: .serif))
                                 .foregroundStyle(theme.navy)
                                 .padding(.leading, 4)
 
-                            ForEach(Scripture.byTheme(themeItem)) { scripture in
+                            ForEach(Scripture.byTestament(testament)) { scripture in
                                 VerseSelectCard(
                                     scripture: scripture,
                                     isSelected: selectedIds.contains(scripture.id)

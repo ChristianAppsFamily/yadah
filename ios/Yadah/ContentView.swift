@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @State private var viewModel = AppViewModel()
@@ -22,6 +23,7 @@ struct ContentView: View {
             }
         }
         .environment(\.themePalette, viewModel.themePalette)
+        .preferredColorScheme(viewModel.preferredColorScheme)
         .animation(.easeInOut(duration: 0.4), value: viewModel.storage.hasOnboarded)
         .animation(.easeInOut(duration: 0.3), value: viewModel.showMoment)
         .animation(.easeInOut(duration: 0.3), value: viewModel.showAmen)
@@ -33,10 +35,8 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .yadahPurchaseUpdated)) { _ in
             Task {
-                if await viewModel.storeKit.refreshEntitlements() {
-                    viewModel.storage.isPremium = true
-                    viewModel.adService.disableAds()
-                }
+                let state = await viewModel.storeKit.refreshEntitlements()
+                viewModel.applyEntitlements(state)
             }
         }
         .sheet(isPresented: $viewModel.showPaywall) {
@@ -49,86 +49,49 @@ struct ContentView: View {
 struct OnboardingFlow: View {
     let viewModel: AppViewModel
     @State private var step: OnboardingStep = .splash
-    @State private var reminderMode: ReminderSetupMode = .random
 
     var body: some View {
         Group {
             switch step {
             case .splash:
                 SplashView {
-                    withAnimation(.easeInOut) { step = .profile }
+                    Task {
+                        await viewModel.requestATTAfterSplash()
+                        withAnimation(.easeInOut) { step = .profile }
+                    }
                 }
 
             case .profile:
-                ProfileSetupView { name, city, state in
-                    viewModel.saveProfile(name: name, city: city, state: state)
-                    withAnimation(.easeInOut) { step = .verseMode }
+                ProfileSetupView(initialProfile: viewModel.storage.userProfile) { name, city, state, wallInitials in
+                    viewModel.saveProfile(
+                        name: name,
+                        city: city,
+                        state: state,
+                        wallInitials: wallInitials
+                    )
+                    withAnimation(.easeInOut) { step = .reminderPrompt }
                 }
 
-            case .verseMode:
-                VerseModeView(selectedMode: Binding(
-                    get: { viewModel.storage.verseMode },
-                    set: { viewModel.storage.verseMode = $0 }
-                )) {
-                    if viewModel.storage.verseMode == .custom {
-                        if viewModel.storage.isPremium {
-                            withAnimation(.easeInOut) { step = .verseLibrary }
-                        } else {
-                            viewModel.storage.verseMode = .random
-                            viewModel.showPaywall = true
-                            withAnimation(.easeInOut) { step = .reminders }
-                        }
-                    } else {
-                        withAnimation(.easeInOut) { step = .reminders }
+            case .reminderPrompt:
+                ReminderPromptView(
+                    onBack: {
+                        withAnimation(.easeInOut) { step = .profile }
+                    },
+                    onYes: {
+                        await viewModel.finishOnboarding(openSettings: true)
+                    },
+                    onNo: {
+                        await viewModel.finishOnboarding(openSettings: false)
                     }
-                }
-
-            case .verseLibrary:
-                VerseLibraryView(selectedIds: Binding(
-                    get: { viewModel.storage.selectedVerseIds },
-                    set: { viewModel.storage.selectedVerseIds = $0 }
-                )) {
-                    withAnimation(.easeInOut) { step = .reminders }
-                }
-
-            case .reminders:
-                ReminderSetupView(selectedMode: $reminderMode) {
-                    Task {
-                        applyReminderMode()
-                        _ = await viewModel.requestNotificationPermission()
-                        viewModel.completeOnboarding()
-                        viewModel.completeSetup()
-                        await viewModel.prepareAdsAfterOnboarding()
-                    }
-                }
+                )
             }
         }
         .transition(.opacity)
     }
-
-    private func applyReminderMode() {
-        var times = viewModel.storage.reminderTimes
-        switch reminderMode {
-        case .random:
-            for index in times.indices {
-                times[index].isEnabled = false
-            }
-            if let morning = times.firstIndex(where: { $0.id == "morning" }) {
-                times[morning].isEnabled = true
-            } else if !times.isEmpty {
-                times[0].isEnabled = true
-            }
-        case .custom:
-            break
-        }
-        viewModel.storage.reminderTimes = times
-        viewModel.storage.normalizeReminderLimits(isPremium: viewModel.storage.isPremium)
-        viewModel.notificationService.scheduleNotifications(for: viewModel.storage.reminderTimes)
-    }
 }
 
 nonisolated enum OnboardingStep: Sendable {
-    case splash, profile, verseMode, verseLibrary, reminders
+    case splash, profile, reminderPrompt
 }
 
 struct MainTabView: View {
@@ -136,27 +99,52 @@ struct MainTabView: View {
     @Environment(\.themePalette) private var theme
 
     var body: some View {
-        VStack(spacing: 0) {
-            TabView(selection: $viewModel.selectedTab) {
-                Tab("Home", systemImage: "house.fill", value: TabSelection.home) {
-                    HomeView(viewModel: viewModel)
-                }
-
-                Tab("Thank You Wall", systemImage: "person.3.fill", value: TabSelection.wall) {
-                    ThankYouWallView(viewModel: viewModel)
-                }
-
-                Tab("Settings", systemImage: "gearshape.fill", value: TabSelection.settings) {
-                    SettingsView(viewModel: viewModel)
-                }
+        TabView(selection: $viewModel.selectedTab) {
+            Tab("Home", systemImage: "house.fill", value: TabSelection.home) {
+                HomeView(viewModel: viewModel)
             }
-            .tint(theme.accent)
 
-            AdBannerContainer(adService: viewModel.adService, isPremium: viewModel.storage.isPremium)
+            Tab("Thank You Wall", systemImage: "person.3.fill", value: TabSelection.wall) {
+                ThankYouWallView(viewModel: viewModel)
+            }
+
+            Tab("Settings", systemImage: "gearshape.fill", value: TabSelection.settings) {
+                SettingsView(viewModel: viewModel)
+            }
+        }
+        .tint(theme.tabSelected)
+        .onAppear {
+            applyTabBarAppearance(theme: theme)
+        }
+        .onChange(of: viewModel.storage.selectedTheme) { _, _ in
+            applyTabBarAppearance(theme: viewModel.themePalette)
         }
         .task {
             await viewModel.prepareAdsAfterOnboarding()
+            if !viewModel.notificationService.isAuthorized {
+                await viewModel.requestNotificationsAfterOnboarding()
+            }
             RateAppService.recordVisitAndMaybePrompt()
         }
+    }
+
+    private func applyTabBarAppearance(theme: ThemePalette) {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(theme.background)
+
+        let selected = UIColor(theme.tabSelected)
+        let unselected = UIColor(theme.tabUnselected)
+
+        appearance.stackedLayoutAppearance.selected.iconColor = selected
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [.foregroundColor: selected]
+        appearance.stackedLayoutAppearance.normal.iconColor = unselected
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [.foregroundColor: unselected]
+
+        appearance.inlineLayoutAppearance = appearance.stackedLayoutAppearance
+        appearance.compactInlineLayoutAppearance = appearance.stackedLayoutAppearance
+
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 }

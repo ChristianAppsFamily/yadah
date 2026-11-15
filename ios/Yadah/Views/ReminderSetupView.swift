@@ -3,6 +3,7 @@ import SwiftUI
 struct ReminderSetupView: View {
     @Environment(\.themePalette) private var theme
     @Binding var selectedMode: ReminderSetupMode
+    var isLoading: Bool = false
     let onStart: () -> Void
 
     var body: some View {
@@ -42,9 +43,24 @@ struct ReminderSetupView: View {
                 .padding(.horizontal, 24)
             }
 
-            SkyBlueButton(title: "Start Receiving") {
+            Button {
                 onStart()
+            } label: {
+                HStack(spacing: 10) {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    Text(isLoading ? "Starting…" : "Start Receiving")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(theme.skyGradient)
+                .clipShape(.capsule)
             }
+            .disabled(isLoading)
             .padding(.horizontal, 32)
             .padding(.bottom, 32)
         }

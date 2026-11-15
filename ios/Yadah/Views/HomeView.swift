@@ -8,15 +8,8 @@ struct HomeView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 28) {
-                    VStack(spacing: 4) {
-                        YadahWordmark(size: .system(.title, design: .serif, weight: .bold))
-
-                        Text("Give Thanks to the Lord")
-                            .font(.system(.caption, design: .serif))
-                            .italic()
-                            .foregroundStyle(theme.warmGray)
-                    }
-                    .padding(.top, 12)
+                    YadahWordmark(size: .system(.title, design: .serif, weight: .bold))
+                        .padding(.top, 12)
 
                     VStack(spacing: 20) {
                         Text(todayDateString)
@@ -50,9 +43,17 @@ struct HomeView: View {
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.showMoment)
             .padding(.horizontal, 32)
-            .padding(.bottom, 16)
+            .padding(.bottom, 40)
         }
-        .background(theme.background)
+        .background {
+            theme.background.ignoresSafeArea()
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            AdBannerContainer(
+                adService: viewModel.adService,
+                adsHidden: viewModel.storage.adsHidden
+            )
+        }
     }
 
     private var todayDateString: String {

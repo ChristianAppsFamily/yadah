@@ -3,7 +3,6 @@ import SwiftUI
 struct ThankYouWallView: View {
     let viewModel: AppViewModel
     @Environment(\.themePalette) private var theme
-    @State private var appeared = false
 
     private var entries: [WallEntry] {
         viewModel.storage.localWallEntries
@@ -11,32 +10,23 @@ struct ThankYouWallView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 4) {
-                YadahWordmark(size: .system(.title2, design: .serif, weight: .bold))
-
-                Text("Thank You Wall")
-                    .font(.system(.headline, design: .serif, weight: .semibold))
-                    .foregroundStyle(theme.navy)
-
-                Text(entries.isEmpty
-                     ? "Your thanks will appear here"
-                     : "Your moments of gratitude")
-                    .font(.caption)
-                    .foregroundStyle(theme.warmGray)
-            }
-            .padding(.top, 12)
-            .padding(.bottom, 16)
+            YadahWordmark(size: .system(.title2, design: .serif, weight: .bold))
+                .padding(.top, 12)
+                .padding(.bottom, 16)
 
             if entries.isEmpty {
                 Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "hands.sparkles")
-                        .font(.system(size: 40))
-                        .foregroundStyle(theme.accent)
+                VStack(spacing: 16) {
+                    Image("yadah_hands_logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 140, height: 140)
+
                     Text("No entries yet")
                         .font(.system(.headline, design: .serif))
                         .foregroundStyle(theme.navy)
-                    Text("Tap Give Thanks on Home to add your first entry. A shared community wall will appear once a backend is connected.")
+
+                    Text("This is a shared community wall of everyone giving thanks, feel free to encourage one another!")
                         .font(.subheadline)
                         .foregroundStyle(theme.warmGray)
                         .multilineTextAlignment(.center)
@@ -46,11 +36,8 @@ struct ThankYouWallView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
-                        ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        ForEach(entries) { entry in
                             WallEntryCard(entry: entry)
-                                .opacity(appeared ? 1 : 0)
-                                .offset(y: appeared ? 0 : 16)
-                                .animation(.spring(response: 0.4).delay(Double(index) * 0.05), value: appeared)
                         }
                     }
                     .padding(.horizontal, 24)
@@ -58,9 +45,14 @@ struct ThankYouWallView: View {
                 }
             }
         }
-        .background(theme.background)
-        .onAppear {
-            appeared = true
+        .background {
+            theme.background.ignoresSafeArea()
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            AdBannerContainer(
+                adService: viewModel.adService,
+                adsHidden: viewModel.storage.adsHidden
+            )
         }
     }
 }

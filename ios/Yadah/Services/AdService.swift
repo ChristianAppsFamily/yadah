@@ -12,17 +12,28 @@ final class AdService {
 
     private var didStartSDK = false
 
-    /// Request ATT (if needed), then start Mobile Ads. Ads must not load before this returns.
-    func prepareAdsIfNeeded(isPremium: Bool) async {
-        if isPremium {
+    /// Request ATT only. Always returns (with timeout) so onboarding cannot hang.
+    func requestATTIfNeeded() async {
+        await withTimeout(seconds: 4) {
+            await self.requestTrackingIfNeeded()
+        }
+        hasCompletedATT = true
+    }
+
+    /// Start ads after ATT has already been answered. Ads must not load before ATT completes.
+    func prepareAdsIfNeeded(adsHidden: Bool) async {
+        if adsHidden {
             disableAds()
-            hasCompletedATT = true
+            if !hasCompletedATT {
+                hasCompletedATT = true
+            }
             return
         }
 
         isAdsAllowed = true
-        await requestTrackingIfNeeded()
-        hasCompletedATT = true
+        if !hasCompletedATT {
+            await requestATTIfNeeded()
+        }
         await startSDKIfNeeded()
     }
 
@@ -31,6 +42,8 @@ final class AdService {
     }
 
     private func requestTrackingIfNeeded() async {
+        try? await Task.sleep(for: .milliseconds(350))
+
         let status = ATTrackingManager.trackingAuthorizationStatus
         if status == .notDetermined {
             let newStatus = await ATTrackingManager.requestTrackingAuthorization()
@@ -51,6 +64,19 @@ final class AdService {
                     continuation.resume()
                 }
             }
+        }
+    }
+
+    private func withTimeout(seconds: Double, operation: @escaping () async -> Void) async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                await operation()
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(seconds))
+            }
+            await group.next()
+            group.cancelAll()
         }
     }
 }

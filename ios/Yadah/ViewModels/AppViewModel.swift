@@ -26,31 +26,45 @@ class AppViewModel {
     }
 
     var maxReminders: Int {
-        storage.isPremium ? 5 : 1
+        storage.isPro ? 5 : 1
     }
 
     var themePalette: ThemePalette {
         let selected = storage.selectedTheme
-        if selected.isProOnly && !storage.isPremium {
+        if selected.isProOnly && !storage.isPro {
             return AppThemeOption.sky.palette
         }
         return selected.palette
     }
 
+    var preferredColorScheme: ColorScheme? {
+        let selected = storage.selectedTheme
+        if selected.isProOnly && !storage.isPro {
+            return .light
+        }
+        return selected.prefersLightColorScheme ? .light : .dark
+    }
+
     func setup() async {
         storeKit.start()
-        if await storeKit.refreshEntitlements() {
-            storage.isPremium = true
-        }
-        storage.normalizeReminderLimits(isPremium: storage.isPremium)
+        applyEntitlements(await storeKit.refreshEntitlements())
+        storage.normalizeReminderLimits(isPro: storage.isPro)
         await notificationService.checkAuthorizationStatus()
         notificationService.scheduleNotifications(for: storage.reminderTimes)
     }
 
+    func requestATTAfterSplash() async {
+        await adService.requestATTIfNeeded()
+    }
+
     func prepareAdsAfterOnboarding() async {
         guard !adsPrepared else { return }
-        await adService.prepareAdsIfNeeded(isPremium: storage.isPremium)
+        await adService.prepareAdsIfNeeded(adsHidden: storage.adsHidden)
         adsPrepared = true
+    }
+
+    func requestNotificationsAfterOnboarding() async {
+        _ = await requestNotificationPermission()
     }
 
     func requestNotificationPermission() async -> Bool {
@@ -69,39 +83,87 @@ class AppViewModel {
         storage.hasCompletedSetup = true
     }
 
-    func saveProfile(name: String, city: String, state: String) {
-        storage.userProfile = UserProfile(name: name, city: city, state: state)
+    /// Requests notification permission first, then leaves onboarding to Home or Settings.
+    func finishOnboarding(openSettings: Bool) async {
+        selectedTab = openSettings ? .settings : .home
+        await requestNotificationsAfterOnboarding()
+        await prepareAdsAfterOnboarding()
+        completeSetup()
+        completeOnboarding()
     }
 
-    func toggleReminder(id: String) {
-        guard let index = storage.reminderTimes.firstIndex(where: { $0.id == id }) else { return }
-        let currentEnabled = storage.reminderTimes.filter(\.isEnabled).count
-        let isCurrentlyEnabled = storage.reminderTimes[index].isEnabled
+    func saveProfile(name: String, city: String, state: String, wallInitials: String? = nil) {
+        storage.userProfile = UserProfile(
+            name: name,
+            city: city,
+            state: state,
+            wallInitials: wallInitials
+        )
+    }
 
-        if !isCurrentlyEnabled && currentEnabled >= maxReminders {
-            showPaywall = true
+    func setReminderEnabled(id: String, isEnabled: Bool) {
+        guard let index = storage.reminderTimes.firstIndex(where: { $0.id == id }) else { return }
+        let current = storage.reminderTimes[index]
+        if current.isEnabled == isEnabled { return }
+
+        if isEnabled {
+            let enabledCount = storage.reminderTimes.filter(\.isEnabled).count
+            if enabledCount >= maxReminders {
+                showPaywall = true
+                return
+            }
+        }
+
+        var times = storage.reminderTimes
+        times[index].isEnabled = isEnabled
+        storage.reminderTimes = times
+        notificationService.scheduleNotifications(for: storage.reminderTimes)
+    }
+
+    func updateReminderTime(id: String, date: Date) {
+        guard let index = storage.reminderTimes.firstIndex(where: { $0.id == id }) else { return }
+
+        if !storage.isPro {
+            let reminder = storage.reminderTimes[index]
+            let enabledCount = storage.reminderTimes.filter(\.isEnabled).count
+            // Free users may edit the single enabled reminder (or the only one if none enabled yet).
+            let canEditFree = reminder.isEnabled || enabledCount == 0
+            if !canEditFree {
+                showPaywall = true
+                return
+            }
+        }
+
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        let newHour = components.hour ?? storage.reminderTimes[index].hour
+        let newMinute = components.minute ?? storage.reminderTimes[index].minute
+        if storage.reminderTimes[index].hour == newHour,
+           storage.reminderTimes[index].minute == newMinute {
             return
         }
 
         var times = storage.reminderTimes
-        times[index].isEnabled.toggle()
+        times[index].hour = newHour
+        times[index].minute = newMinute
         storage.reminderTimes = times
         notificationService.scheduleNotifications(for: storage.reminderTimes)
     }
 
     func setVerseMode(_ mode: VerseMode) {
-        if mode == .custom && !storage.isPremium {
+        if mode == .custom && !storage.isPro {
             showPaywall = true
             return
         }
+        if storage.verseMode == mode { return }
         storage.verseMode = mode
     }
 
     func setTheme(_ theme: AppThemeOption) {
-        if theme.isProOnly && !storage.isPremium {
+        if theme.isProOnly && !storage.isPro {
             showPaywall = true
             return
         }
+        if storage.selectedTheme == theme { return }
         storage.selectedTheme = theme
     }
 
@@ -130,23 +192,56 @@ class AppViewModel {
     }
 
     func purchaseRemoveAds() async {
-        let success = await storeKit.purchase()
+        let success = await storeKit.purchaseRemoveAds()
         if success {
-            storage.isPremium = true
+            storage.hasRemovedAds = true
             adsPrepared = true
             adService.disableAds()
             showPaywall = false
         }
     }
 
+    func purchaseProMonthly() async {
+        let success = await storeKit.purchaseMonthly()
+        if success {
+            applyProPurchase()
+        }
+    }
+
+    func purchaseProYearly() async {
+        let success = await storeKit.purchaseYearly()
+        if success {
+            applyProPurchase()
+        }
+    }
+
     func restorePurchases() async {
-        let restored = await storeKit.restore()
-        let entitled = await storeKit.refreshEntitlements()
-        if restored || entitled {
-            storage.isPremium = true
-            adService.disableAds()
+        let state = await storeKit.restore()
+        applyEntitlements(state)
+        if state.hasRemovedAds || state.isPro {
             showPaywall = false
         }
+    }
+
+    func applyEntitlements(_ state: EntitlementState) {
+        if state.isPro {
+            storage.isPro = true
+            storage.hasRemovedAds = true
+            adService.disableAds()
+        } else if state.hasRemovedAds {
+            storage.hasRemovedAds = true
+            adService.disableAds()
+        }
+        storage.normalizeReminderLimits(isPro: storage.isPro)
+    }
+
+    private func applyProPurchase() {
+        storage.isPro = true
+        storage.hasRemovedAds = true
+        adsPrepared = true
+        adService.disableAds()
+        showPaywall = false
+        storage.normalizeReminderLimits(isPro: true)
     }
 }
 

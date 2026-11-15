@@ -5,14 +5,18 @@ import Foundation
 class StorageService {
     private let defaults = UserDefaults.standard
 
+    /// Stored so `@Observable` notifies SwiftUI (UserDefaults-only computed setters do not).
     var hasOnboarded: Bool {
-        get { defaults.bool(forKey: "yadah_hasOnboarded") }
-        set { defaults.set(newValue, forKey: "yadah_hasOnboarded") }
+        didSet { defaults.set(hasOnboarded, forKey: "yadah_hasOnboarded") }
     }
 
     var hasCompletedSetup: Bool {
-        get { defaults.bool(forKey: "yadah_hasCompletedSetup") }
-        set { defaults.set(newValue, forKey: "yadah_hasCompletedSetup") }
+        didSet { defaults.set(hasCompletedSetup, forKey: "yadah_hasCompletedSetup") }
+    }
+
+    init() {
+        hasOnboarded = defaults.bool(forKey: "yadah_hasOnboarded")
+        hasCompletedSetup = defaults.bool(forKey: "yadah_hasCompletedSetup")
     }
 
     var verseMode: VerseMode {
@@ -28,18 +32,36 @@ class StorageService {
         set { defaults.set(newValue, forKey: "yadah_selectedVerses") }
     }
 
-    var isPremium: Bool {
-        get { defaults.bool(forKey: "yadah_isPremium") }
-        set { defaults.set(newValue, forKey: "yadah_isPremium") }
+    /// Legacy single flag — migrated into isPro + hasRemovedAds on first read.
+    private var legacyIsPremium: Bool {
+        defaults.bool(forKey: "yadah_isPremium")
+    }
+
+    var isPro: Bool {
+        get {
+            migrateLegacyPremiumIfNeeded()
+            return defaults.bool(forKey: "yadah_isPro")
+        }
+        set { defaults.set(newValue, forKey: "yadah_isPro") }
+    }
+
+    var hasRemovedAds: Bool {
+        get {
+            migrateLegacyPremiumIfNeeded()
+            return defaults.bool(forKey: "yadah_hasRemovedAds")
+        }
+        set { defaults.set(newValue, forKey: "yadah_hasRemovedAds") }
+    }
+
+    var adsHidden: Bool {
+        hasRemovedAds || isPro
     }
 
     var selectedTheme: AppThemeOption {
         get {
-            guard let raw = defaults.string(forKey: "yadah_selectedTheme"),
-                  let theme = AppThemeOption(rawValue: raw) else {
-                return .sky
-            }
-            return theme
+            guard let raw = defaults.string(forKey: "yadah_selectedTheme") else { return .sky }
+            if raw == "softCream" { return .day }
+            return AppThemeOption(rawValue: raw) ?? .sky
         }
         set { defaults.set(newValue.rawValue, forKey: "yadah_selectedTheme") }
     }
@@ -96,6 +118,16 @@ class StorageService {
         set { defaults.set(newValue, forKey: "yadah_totalCount") }
     }
 
+    private func migrateLegacyPremiumIfNeeded() {
+        let migratedKey = "yadah_premiumMigrated"
+        guard !defaults.bool(forKey: migratedKey) else { return }
+        if legacyIsPremium {
+            defaults.set(true, forKey: "yadah_isPro")
+            defaults.set(true, forKey: "yadah_hasRemovedAds")
+        }
+        defaults.set(true, forKey: migratedKey)
+    }
+
     private func checkDateReset() {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -141,19 +173,15 @@ class StorageService {
         localWallEntries = entries
     }
 
-    /// Ensures free users only have one enabled reminder.
-    func normalizeReminderLimits(isPremium: Bool) {
+    /// Caps enabled reminders for free vs Pro. Does not force-enable when the user turns all off.
+    func normalizeReminderLimits(isPro: Bool) {
         var times = reminderTimes
         let enabledIndexes = times.indices.filter { times[$0].isEnabled }
-        let maxAllowed = isPremium ? 5 : 1
-        if enabledIndexes.count > maxAllowed {
-            for index in enabledIndexes.dropFirst(maxAllowed) {
-                times[index].isEnabled = false
-            }
-            reminderTimes = times
-        } else if enabledIndexes.isEmpty, let first = times.indices.first {
-            times[first].isEnabled = true
-            reminderTimes = times
+        let maxAllowed = isPro ? 5 : 1
+        guard enabledIndexes.count > maxAllowed else { return }
+        for index in enabledIndexes.dropFirst(maxAllowed) {
+            times[index].isEnabled = false
         }
+        reminderTimes = times
     }
 }

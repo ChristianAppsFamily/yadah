@@ -10,45 +10,82 @@ struct SettingsView: View {
             VStack(spacing: 28) {
                 YadahWordmark(size: .system(.title2, design: .serif, weight: .bold))
                     .padding(.top, 12)
+                    .padding(.horizontal, 24)
 
-                remindersSection
-                themesSection
-                versesSection
-                connectSection
-                aboutSection
+                AdBannerContainer(
+                    adService: viewModel.adService,
+                    adsHidden: viewModel.storage.adsHidden
+                )
 
-                if !viewModel.storage.isPremium {
-                    Button {
-                        viewModel.showPaywall = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "crown.fill")
-                                .foregroundStyle(.white)
-                            Text("Remove Ads Pro — \(viewModel.storeKit.displayPrice)")
-                                .font(.system(.body, weight: .semibold))
-                                .foregroundStyle(.white)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(theme.skyGradient)
-                        .clipShape(.capsule)
-                    }
+                VStack(spacing: 28) {
+                    upgradeSection
+                    remindersSection
+                    themesSection
+                    versesSection
+                    connectSection
+                    aboutSection
+                    footer
                 }
-
-                footer
+                .padding(.horizontal, 24)
             }
-            .padding(.horizontal, 24)
             .padding(.bottom, 32)
         }
-        .background(theme.background)
+        .background {
+            theme.background.ignoresSafeArea()
+        }
         .task {
             await viewModel.storeKit.loadProducts()
+        }
+    }
+
+    private var upgradeSection: some View {
+        VStack(spacing: 12) {
+            if !viewModel.storage.isPro {
+                Button {
+                    viewModel.showPaywall = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "crown.fill")
+                            .foregroundStyle(.white)
+                        Text("Yadah Pro")
+                            .font(.system(.body, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(theme.skyGradient)
+                    .clipShape(.capsule)
+                }
+            }
+
+            if !viewModel.storage.adsHidden {
+                Button {
+                    viewModel.showPaywall = true
+                } label: {
+                    Text("REMOVE ADS: One-Time-\(viewModel.storeKit.removeAdsDisplayPrice)")
+                        .font(.system(.body, weight: .semibold))
+                        .foregroundStyle(theme.navy)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
+                        .overlay {
+                            Capsule().stroke(theme.accent, lineWidth: 1.5)
+                        }
+                }
+            }
         }
     }
 
     private var remindersSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSectionHeader(title: "Reminders")
+
+            HStack(spacing: 6) {
+                Image(systemName: "pencil.circle.fill")
+                    .foregroundStyle(theme.accentDark)
+                Text("Tap a time to edit.")
+                    .font(.caption)
+                    .foregroundStyle(theme.warmGray)
+            }
 
             if !viewModel.notificationService.isAuthorized {
                 Button {
@@ -62,16 +99,26 @@ struct SettingsView: View {
                 }
             }
 
-            if !viewModel.storage.isPremium {
-                Text("Free: 1 reminder · Pro: up to 5")
+            if !viewModel.storage.isPro {
+                Text("Free: 1 reminder · Pro: up to 5 custom times")
                     .font(.caption)
                     .foregroundStyle(theme.warmGray)
             }
 
-            ForEach(viewModel.storage.reminderTimes, id: \.id) { reminder in
-                ReminderRow(reminder: reminder) {
-                    viewModel.toggleReminder(id: reminder.id)
-                }
+            ForEach(viewModel.storage.reminderTimes) { reminder in
+                ReminderRow(
+                    reminder: reminder,
+                    isPro: viewModel.storage.isPro,
+                    onEnabledChange: { enabled in
+                        viewModel.setReminderEnabled(id: reminder.id, isEnabled: enabled)
+                    },
+                    onTimeChange: { date in
+                        viewModel.updateReminderTime(id: reminder.id, date: date)
+                    },
+                    onLockedTap: {
+                        viewModel.showPaywall = true
+                    }
+                )
             }
         }
     }
@@ -106,7 +153,7 @@ struct SettingsView: View {
                 }
 
                 SettingsOptionRow(
-                    title: viewModel.storage.isPremium ? "Choose My Own" : "Choose My Own (Pro)",
+                    title: viewModel.storage.isPro ? "Choose My Own" : "Choose My Own (Pro)",
                     isSelected: viewModel.storage.verseMode == .custom
                 ) {
                     viewModel.setVerseMode(.custom)
@@ -213,26 +260,63 @@ struct SettingsSectionHeader: View {
 struct ReminderRow: View {
     @Environment(\.themePalette) private var theme
     let reminder: ReminderTime
-    let onToggle: () -> Void
+    let isPro: Bool
+    let onEnabledChange: (Bool) -> Void
+    let onTimeChange: (Date) -> Void
+    let onLockedTap: () -> Void
+
+    private var timeEditingLocked: Bool {
+        !isPro && !reminder.isEnabled
+    }
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(reminder.displayTime)
-                    .font(.system(.body, design: .serif, weight: .medium))
-                    .foregroundStyle(theme.navy)
-
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(reminder.name)
                     .font(.caption)
                     .foregroundStyle(theme.warmGray)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundStyle(theme.accentDark)
+
+                    if timeEditingLocked {
+                        Button(action: onLockedTap) {
+                            HStack(spacing: 4) {
+                                Text(reminder.displayTime)
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(theme.navy)
+                                Image(systemName: "lock.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(theme.warmGray)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: { reminder.asDate },
+                                set: { onTimeChange($0) }
+                            ),
+                            displayedComponents: .hourAndMinute
+                        )
+                        .labelsHidden()
+                        .tint(theme.accent)
+                    }
+                }
             }
 
             Spacer()
 
-            Toggle("", isOn: Binding(
-                get: { reminder.isEnabled },
-                set: { _ in onToggle() }
-            ))
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { reminder.isEnabled },
+                    set: { onEnabledChange($0) }
+                )
+            )
             .tint(theme.accent)
             .labelsHidden()
         }
@@ -272,6 +356,7 @@ struct SettingsOptionRow: View {
                     .stroke(isSelected ? theme.accent : theme.lightBorder, lineWidth: isSelected ? 1.5 : 1)
             }
             .clipShape(.rect(cornerRadius: 12))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
