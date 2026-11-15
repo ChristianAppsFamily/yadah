@@ -48,19 +48,12 @@ struct ContentView: View {
 
 struct OnboardingFlow: View {
     let viewModel: AppViewModel
-    @State private var step: OnboardingStep = .splash
+    @State private var step: OnboardingStep = .profile
+    @State private var didRequestATT = false
 
     var body: some View {
         Group {
             switch step {
-            case .splash:
-                SplashView {
-                    Task {
-                        await viewModel.requestATTAfterSplash()
-                        withAnimation(.easeInOut) { step = .profile }
-                    }
-                }
-
             case .profile:
                 ProfileSetupView(initialProfile: viewModel.storage.userProfile) { name, city, state, wallInitials in
                     viewModel.saveProfile(
@@ -87,11 +80,17 @@ struct OnboardingFlow: View {
             }
         }
         .transition(.opacity)
+        .task {
+            guard !didRequestATT else { return }
+            didRequestATT = true
+            // System LaunchScreen already showed CAE; request ATT once before setup continues.
+            await viewModel.requestATTAfterSplash()
+        }
     }
 }
 
 nonisolated enum OnboardingStep: Sendable {
-    case splash, profile, reminderPrompt
+    case profile, reminderPrompt
 }
 
 struct MainTabView: View {

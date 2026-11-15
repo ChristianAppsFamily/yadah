@@ -105,6 +105,17 @@ class StorageService {
         }
     }
 
+    /// Stable anonymous id for light wall rate limiting (not a login).
+    var wallDeviceId: String {
+        let key = "yadah_wallDeviceId"
+        if let existing = defaults.string(forKey: key), !existing.isEmpty {
+            return existing
+        }
+        let id = UUID().uuidString
+        defaults.set(id, forKey: key)
+        return id
+    }
+
     var todayCount: Int {
         get {
             checkDateReset()

@@ -151,8 +151,7 @@ final class WallService {
         decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let raw = try container.decode(String.self)
-            if let date = iso8601WithFractional.date(from: raw)
-                ?? iso8601.date(from: raw) {
+            if let date = WallDateParsing.date(from: raw) {
                 return date
             }
             throw DecodingError.dataCorruptedError(
@@ -162,18 +161,19 @@ final class WallService {
         }
         return decoder
     }
+}
 
-    private static let iso8601WithFractional: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private static let iso8601: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
+private enum WallDateParsing {
+    nonisolated static func date(from raw: String) -> Date? {
+        let withFractional = ISO8601DateFormatter()
+        withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFractional.date(from: raw) {
+            return date
+        }
+        let standard = ISO8601DateFormatter()
+        standard.formatOptions = [.withInternetDateTime]
+        return standard.date(from: raw)
+    }
 }
 
 // MARK: - DTOs

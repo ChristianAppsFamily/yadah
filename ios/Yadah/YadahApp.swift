@@ -18,6 +18,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+        // Avoid a colored window flash before the CAE launch screen / first SwiftUI frame.
+        if let windowScene = application.connectedScenes.first as? UIWindowScene {
+            windowScene.windows.forEach { $0.backgroundColor = .black }
+        }
         return true
     }
 }
