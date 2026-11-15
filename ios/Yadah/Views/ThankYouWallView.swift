@@ -62,27 +62,29 @@ struct WallEntryCard: View {
     let entry: WallEntry
 
     var body: some View {
-        HStack(spacing: 16) {
-            Rectangle()
-                .fill(theme.skyGradient)
-                .frame(width: 4)
-                .clipShape(.capsule)
+        HStack(spacing: 14) {
+            Text(entry.initials)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(theme.navy)
+                .frame(width: 40, height: 40)
+                .background(theme.accentLight.opacity(0.55))
+                .clipShape(.circle)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(entry.initials)
-                    .font(.system(.headline, design: .serif, weight: .bold))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(theme.navy)
 
                 Text(entry.city)
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
                     .foregroundStyle(theme.warmGray)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Text(timeAgo(entry.timestamp))
-                .font(.caption2)
-                .foregroundStyle(theme.warmGray.opacity(0.7))
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(theme.warmGray.opacity(0.65))
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 16)

@@ -3,10 +3,22 @@ import UIKit
 
 struct ContentView: View {
     @State private var viewModel = AppViewModel()
+    @State private var showSplash = true
 
     var body: some View {
         Group {
-            if !viewModel.storage.hasOnboarded {
+            if showSplash {
+                SplashView {
+                    Task {
+                        if !viewModel.storage.hasOnboarded {
+                            await viewModel.requestATTAfterSplash()
+                        }
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            showSplash = false
+                        }
+                    }
+                }
+            } else if !viewModel.storage.hasOnboarded {
                 OnboardingFlow(viewModel: viewModel)
             } else if viewModel.showMoment {
                 MomentView(scripture: viewModel.currentScripture) {
@@ -49,7 +61,6 @@ struct ContentView: View {
 struct OnboardingFlow: View {
     let viewModel: AppViewModel
     @State private var step: OnboardingStep = .profile
-    @State private var didRequestATT = false
 
     var body: some View {
         Group {
@@ -80,12 +91,6 @@ struct OnboardingFlow: View {
             }
         }
         .transition(.opacity)
-        .task {
-            guard !didRequestATT else { return }
-            didRequestATT = true
-            // System LaunchScreen already showed CAE; request ATT once before setup continues.
-            await viewModel.requestATTAfterSplash()
-        }
     }
 }
 

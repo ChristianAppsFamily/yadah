@@ -40,19 +40,19 @@ extension Scripture {
 
     private static func loadLibrary() -> [Scripture] {
         guard let url = Bundle.main.url(
-            forResource: "thanksgiving_verses_180_WEB",
+            forResource: "thanksgiving_verses_180",
             withExtension: "json"
         ) else {
-            assertionFailure("Missing thanksgiving_verses_180_WEB.json in app bundle")
+            assertionFailure("Missing thanksgiving_verses_180.json in app bundle")
             return []
         }
 
         do {
             let data = try Data(contentsOf: url)
-            let rows = try JSONDecoder().decode([WEBVerseDTO].self, from: data)
+            let rows = try JSONDecoder().decode([VerseDTO].self, from: data)
             return rows.map { row in
                 Scripture(
-                    id: "web-\(row.id)",
+                    id: "verse-\(row.id)",
                     text: row.text,
                     reference: row.reference,
                     theme: .praise,
@@ -60,13 +60,13 @@ extension Scripture {
                 )
             }
         } catch {
-            assertionFailure("Failed to decode thanksgiving_verses_180_WEB.json: \(error)")
+            assertionFailure("Failed to decode thanksgiving_verses_180.json: \(error)")
             return []
         }
     }
 }
 
-private struct WEBVerseDTO: Decodable {
+private struct VerseDTO: Decodable {
     let id: Int
     let reference: String
     let text: String

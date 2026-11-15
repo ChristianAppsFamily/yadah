@@ -14,9 +14,21 @@ class StorageService {
         didSet { defaults.set(hasCompletedSetup, forKey: "yadah_hasCompletedSetup") }
     }
 
+    /// Stored so theme changes notify SwiftUI (UserDefaults-only computed setters do not).
+    var selectedTheme: AppThemeOption {
+        didSet { defaults.set(selectedTheme.rawValue, forKey: "yadah_selectedTheme") }
+    }
+
     init() {
         hasOnboarded = defaults.bool(forKey: "yadah_hasOnboarded")
         hasCompletedSetup = defaults.bool(forKey: "yadah_hasCompletedSetup")
+        selectedTheme = Self.loadSelectedTheme(from: UserDefaults.standard)
+    }
+
+    private static func loadSelectedTheme(from defaults: UserDefaults) -> AppThemeOption {
+        guard let raw = defaults.string(forKey: "yadah_selectedTheme") else { return .sky }
+        if raw == "softCream" { return .day }
+        return AppThemeOption(rawValue: raw) ?? .sky
     }
 
     var verseMode: VerseMode {
@@ -55,15 +67,6 @@ class StorageService {
 
     var adsHidden: Bool {
         hasRemovedAds || isPro
-    }
-
-    var selectedTheme: AppThemeOption {
-        get {
-            guard let raw = defaults.string(forKey: "yadah_selectedTheme") else { return .sky }
-            if raw == "softCream" { return .day }
-            return AppThemeOption(rawValue: raw) ?? .sky
-        }
-        set { defaults.set(newValue.rawValue, forKey: "yadah_selectedTheme") }
     }
 
     var userProfile: UserProfile? {

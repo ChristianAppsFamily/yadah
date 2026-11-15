@@ -11,10 +11,13 @@ nonisolated struct UserProfile: Codable, Sendable {
         if let wallInitials, !wallInitials.isEmpty {
             return wallInitials.uppercased()
         }
-        let parts = name.split(separator: " ")
+        let parts = name.split(separator: " ").filter { !$0.isEmpty }
         if parts.count >= 2 {
             return String(parts[0].prefix(1) + parts[1].prefix(1)).uppercased()
         }
-        return String(name.prefix(2)).uppercased()
+        if let first = parts.first {
+            return String(first.prefix(1)).uppercased()
+        }
+        return "?"
     }
 }
