@@ -1,38 +1,34 @@
 import SwiftUI
 
 struct ThankYouWallView: View {
-    let viewModel: AppViewModel
+    @Bindable var viewModel: AppViewModel
     @Environment(\.themePalette) private var theme
 
     private var entries: [WallEntry] {
-        viewModel.storage.localWallEntries
+        viewModel.wallService.entries
+    }
+
+    private var thanksTotal: Int {
+        viewModel.wallService.displayedThanksTotal
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            YadahWordmark(size: .system(.title2, design: .serif, weight: .bold))
-                .padding(.top, 12)
-                .padding(.bottom, 16)
+            VStack(spacing: 8) {
+                YadahWordmark(size: .system(.title2, design: .serif, weight: .bold))
 
-            if entries.isEmpty {
-                Spacer()
-                VStack(spacing: 16) {
-                    Image("yadah_hands_logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 140, height: 140)
+                Text(thanksTotalLabel)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(theme.warmGray)
+                    .monospacedDigit()
+            }
+            .padding(.top, 12)
+            .padding(.bottom, 16)
 
-                    Text("No entries yet")
-                        .font(.system(.headline, design: .serif))
-                        .foregroundStyle(theme.navy)
-
-                    Text("This is a shared community wall of everyone giving thanks, feel free to encourage one another!")
-                        .font(.subheadline)
-                        .foregroundStyle(theme.warmGray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
-                Spacer()
+            if !viewModel.hasJoinedWall {
+                joinPrompt
+            } else if entries.isEmpty {
+                emptyState
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -42,6 +38,9 @@ struct ThankYouWallView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
+                }
+                .refreshable {
+                    await viewModel.wallService.refresh()
                 }
             }
         }
@@ -53,6 +52,73 @@ struct ThankYouWallView: View {
                 adService: viewModel.adService,
                 adsHidden: viewModel.storage.adsHidden
             )
+        }
+        .task {
+            await viewModel.wallService.refresh()
+        }
+    }
+
+    private var thanksTotalLabel: String {
+        let formatted = thanksTotal.formatted(.number.grouping(.automatic))
+        if thanksTotal == 1 {
+            return "1 has given thanks"
+        }
+        return "\(formatted) have given thanks"
+    }
+
+    private var joinPrompt: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image("yadah_hands_logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 140, height: 140)
+
+            Text("Join the Thank You Wall")
+                .font(.system(.headline, design: .serif))
+                .foregroundStyle(theme.navy)
+
+            Text("Add your name and city so others can see you giving thanks.")
+                .font(.subheadline)
+                .foregroundStyle(theme.warmGray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            Button {
+                viewModel.openWallJoinInSettings()
+            } label: {
+                Text("Join the wall!")
+                    .font(.system(.body, design: .serif, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(theme.skyGradient)
+                    .clipShape(.capsule)
+            }
+            .padding(.horizontal, 32)
+
+            Spacer()
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image("yadah_hands_logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 140, height: 140)
+
+            Text("No entries yet")
+                .font(.system(.headline, design: .serif))
+                .foregroundStyle(theme.navy)
+
+            Text("This is a shared community wall of everyone giving thanks, feel free to encourage one another!")
+                .font(.subheadline)
+                .foregroundStyle(theme.warmGray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Spacer()
         }
     }
 }

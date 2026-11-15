@@ -3,7 +3,8 @@ import SwiftUI
 @Observable
 @MainActor
 class AppViewModel {
-    let storage = StorageService()
+    let storage: StorageService
+    let wallService: WallService
     let notificationService = NotificationService()
     let adService = AdService()
     let storeKit = StoreKitService()
@@ -13,6 +14,14 @@ class AppViewModel {
     var selectedTab: TabSelection = .home
     var showPaywall = false
     var adsPrepared = false
+    /// When true, Settings should emphasize the profile section (from Join the wall).
+    var focusProfileInSettings = false
+
+    init() {
+        let storage = StorageService()
+        self.storage = storage
+        self.wallService = WallService(storage: storage)
+    }
 
     var currentScripture: Scripture {
         if storage.verseMode == .custom, !storage.selectedVerseIds.isEmpty {
@@ -27,6 +36,10 @@ class AppViewModel {
 
     var maxReminders: Int {
         storage.isPro ? 5 : 1
+    }
+
+    var hasJoinedWall: Bool {
+        storage.userProfile?.hasJoinedWall == true
     }
 
     var themePalette: ThemePalette {
@@ -83,13 +96,22 @@ class AppViewModel {
         storage.hasCompletedSetup = true
     }
 
-    /// Requests notification permission first, then leaves onboarding to Home or Settings.
-    func finishOnboarding(openSettings: Bool) async {
+    /// Enters the app immediately; notifications/ads continue in the background.
+    func finishOnboarding(openSettings: Bool, requestNotifications: Bool) {
         selectedTab = openSettings ? .settings : .home
-        await requestNotificationsAfterOnboarding()
-        await prepareAdsAfterOnboarding()
         completeSetup()
         completeOnboarding()
+        Task {
+            if requestNotifications {
+                await requestNotificationsAfterOnboarding()
+            }
+            await prepareAdsAfterOnboarding()
+        }
+    }
+
+    func openWallJoinInSettings() {
+        focusProfileInSettings = true
+        selectedTab = .settings
     }
 
     func saveProfile(name: String, city: String, state: String, wallInitials: String? = nil) {
@@ -99,6 +121,7 @@ class AppViewModel {
             state: state,
             wallInitials: wallInitials
         )
+        focusProfileInSettings = false
     }
 
     func setReminderEnabled(id: String, isEnabled: Bool) {
@@ -126,7 +149,6 @@ class AppViewModel {
         if !storage.isPro {
             let reminder = storage.reminderTimes[index]
             let enabledCount = storage.reminderTimes.filter(\.isEnabled).count
-            // Free users may edit the single enabled reminder (or the only one if none enabled yet).
             let canEditFree = reminder.isEnabled || enabledCount == 0
             if !canEditFree {
                 showPaywall = true
@@ -185,6 +207,11 @@ class AppViewModel {
         showMoment = false
         showAmen = true
         storage.recordAmen()
+        if hasJoinedWall {
+            Task {
+                await wallService.postGiveThanks()
+            }
+        }
     }
 
     func completeAmen() {

@@ -3,6 +3,8 @@ import SwiftUI
 struct ProfileSetupView: View {
     @Environment(\.themePalette) private var theme
     let initialProfile: UserProfile?
+    var embeddedInSettings: Bool = false
+    var saveButtonTitle: String = "Done"
     let onDone: (String, String, String, String?) -> Void
 
     @State private var firstName: String
@@ -17,8 +19,15 @@ struct ProfileSetupView: View {
         case firstName, initials, customCity, customState
     }
 
-    init(initialProfile: UserProfile? = nil, onDone: @escaping (String, String, String, String?) -> Void) {
+    init(
+        initialProfile: UserProfile? = nil,
+        embeddedInSettings: Bool = false,
+        saveButtonTitle: String = "Done",
+        onDone: @escaping (String, String, String, String?) -> Void
+    ) {
         self.initialProfile = initialProfile
+        self.embeddedInSettings = embeddedInSettings
+        self.saveButtonTitle = saveButtonTitle
         self.onDone = onDone
 
         let draft = Self.draft(from: initialProfile)
@@ -31,75 +40,92 @@ struct ProfileSetupView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 28) {
-                    YadahWordmark()
-                        .padding(.top, 20)
-
-                    VStack(spacing: 8) {
-                        Text("Lets get started.")
-                            .font(.system(.title2, design: .serif, weight: .bold))
-                            .foregroundStyle(theme.navy)
-
-                        Text("Stay safe enter ONLY the basics.")
-                            .font(.subheadline)
-                            .foregroundStyle(theme.warmGray)
-                            .multilineTextAlignment(.center)
-                    }
-
-                    VStack(spacing: 14) {
-                        focusableField(placeholder: "First Name only", text: $firstName, field: .firstName)
-                            .textContentType(.givenName)
-                            .submitLabel(.next)
-                            .onSubmit { focusedField = .initials }
-
-                        focusableField(placeholder: "or Initials", text: $initials, field: .initials)
-                            .textInputAutocapitalization(.characters)
-                            .submitLabel(.done)
-                            .onSubmit { focusedField = nil }
-                            .onChange(of: initials) { _, newValue in
-                                if newValue.count > 3 {
-                                    initials = String(newValue.prefix(3))
-                                }
-                            }
-
-                        locationMenu(
-                            title: "City",
-                            selection: $selectedCity,
-                            options: LocationOptions.usCities,
-                            customText: $customCity,
-                            customField: .customCity
-                        )
-
-                        locationMenu(
-                            title: "State",
-                            selection: $selectedState,
-                            options: LocationOptions.usStates,
-                            customText: $customState,
-                            customField: .customState
-                        )
-                    }
+        VStack(spacing: embeddedInSettings ? 16 : 0) {
+            if embeddedInSettings {
+                formFields
+                SkyBlueButton(title: saveButtonTitle) {
+                    save()
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-            }
+            } else {
+                ScrollView {
+                    VStack(spacing: 28) {
+                        YadahWordmark()
+                            .padding(.top, 20)
 
-            SkyBlueButton(title: "Done") {
-                let trimmedName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedInitials = initials.trimmingCharacters(in: .whitespacesAndNewlines)
-                let displayName = !trimmedName.isEmpty
-                    ? trimmedName
-                    : (!trimmedInitials.isEmpty ? trimmedInitials : "Friend")
-                let wallInitials = !trimmedInitials.isEmpty ? trimmedInitials : nil
-                onDone(displayName, resolvedCity, resolvedState, wallInitials)
+                        VStack(spacing: 8) {
+                            Text("Lets get started.")
+                                .font(.system(.title2, design: .serif, weight: .bold))
+                                .foregroundStyle(theme.navy)
+
+                            Text("Stay safe enter ONLY the basics.")
+                                .font(.subheadline)
+                                .foregroundStyle(theme.warmGray)
+                                .multilineTextAlignment(.center)
+                        }
+
+                        formFields
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                }
+
+                SkyBlueButton(title: saveButtonTitle) {
+                    save()
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 32)
         }
         .background {
-            theme.background.ignoresSafeArea()
+            if !embeddedInSettings {
+                theme.background.ignoresSafeArea()
+            }
         }
+    }
+
+    private var formFields: some View {
+        VStack(spacing: 14) {
+            focusableField(placeholder: "First Name only", text: $firstName, field: .firstName)
+                .textContentType(.givenName)
+                .submitLabel(.next)
+                .onSubmit { focusedField = .initials }
+
+            focusableField(placeholder: "or Initials", text: $initials, field: .initials)
+                .textInputAutocapitalization(.characters)
+                .submitLabel(.done)
+                .onSubmit { focusedField = nil }
+                .onChange(of: initials) { _, newValue in
+                    if newValue.count > 3 {
+                        initials = String(newValue.prefix(3))
+                    }
+                }
+
+            locationMenu(
+                title: "City",
+                selection: $selectedCity,
+                options: LocationOptions.usCities,
+                customText: $customCity,
+                customField: .customCity
+            )
+
+            locationMenu(
+                title: "State",
+                selection: $selectedState,
+                options: LocationOptions.usStates,
+                customText: $customState,
+                customField: .customState
+            )
+        }
+    }
+
+    private func save() {
+        let trimmedName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedInitials = initials.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = !trimmedName.isEmpty
+            ? trimmedName
+            : (!trimmedInitials.isEmpty ? trimmedInitials : "Friend")
+        let wallInitials = !trimmedInitials.isEmpty ? trimmedInitials : nil
+        onDone(displayName, resolvedCity, resolvedState, wallInitials)
     }
 
     private static func draft(from profile: UserProfile?) -> (

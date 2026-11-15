@@ -9,15 +9,19 @@ struct SplashView: View {
             Color.black
                 .ignoresSafeArea()
 
-            Image("cae_splash")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityHidden(true)
+            GeometryReader { proxy in
+                Image("cae_splash")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .accessibilityHidden(true)
+            }
+            .ignoresSafeArea()
         }
         .statusBarHidden()
         .task {
-            try? await Task.sleep(for: .seconds(1.7))
+            try? await Task.sleep(for: .seconds(1.0))
             finishOnce()
         }
     }

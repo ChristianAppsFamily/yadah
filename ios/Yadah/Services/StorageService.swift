@@ -158,33 +158,6 @@ class StorageService {
         checkDateReset()
         todayCount += 1
         totalCount += 1
-        appendLocalWallEntry()
-    }
-
-    private func appendLocalWallEntry() {
-        guard let profile = userProfile else { return }
-        let cityLabel: String
-        if profile.city.isEmpty {
-            cityLabel = "Somewhere"
-        } else if profile.state.isEmpty {
-            cityLabel = profile.city
-        } else {
-            cityLabel = "\(profile.city), \(profile.state)"
-        }
-        var entries = localWallEntries
-        entries.insert(
-            WallEntry(
-                id: UUID().uuidString,
-                initials: profile.initials,
-                city: cityLabel,
-                timestamp: Date()
-            ),
-            at: 0
-        )
-        if entries.count > 50 {
-            entries = Array(entries.prefix(50))
-        }
-        localWallEntries = entries
     }
 
     /// Caps enabled reminders for free vs Pro. Does not force-enable when the user turns all off.

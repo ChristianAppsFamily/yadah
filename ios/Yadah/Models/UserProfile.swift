@@ -20,4 +20,14 @@ nonisolated struct UserProfile: Codable, Sendable {
         }
         return "?"
     }
+
+    /// Enough identity + place to appear on the shared Thank You Wall.
+    var hasJoinedWall: Bool {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasIdentity =
+            !(wallInitials?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            || (!trimmedName.isEmpty && trimmedName != "Friend")
+        let hasPlace = !city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return hasIdentity && hasPlace
+    }
 }

@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class WallService {
     private(set) var entries: [WallEntry] = []
+    private(set) var communityTotal = 0
     private(set) var isLoading = false
     private(set) var lastError: String?
 
@@ -14,12 +15,22 @@ final class WallService {
         self.storage = storage
         self.session = session
         self.entries = storage.localWallEntries
+        self.communityTotal = max(storage.localWallEntries.count, storage.totalCount)
+    }
+
+    /// Display total: prefer remote community count, never below local activity.
+    var displayedThanksTotal: Int {
+        max(communityTotal, entries.count, storage.totalCount)
+    }
+
+    func refresh() async {
+        isLoading = true
+        defer { isLoading = false }
+        await fetchLatest(limit: 50)
+        await fetchEntryCount()
     }
 
     func fetchLatest(limit: Int = 50) async {
-        isLoading = true
-        defer { isLoading = false }
-
         do {
             let remote = try await performFetch(limit: limit)
             entries = remote
@@ -31,9 +42,18 @@ final class WallService {
         }
     }
 
+    func fetchEntryCount() async {
+        do {
+            let count = try await performCount()
+            communityTotal = max(count, entries.count, storage.totalCount)
+        } catch {
+            communityTotal = max(communityTotal, entries.count, storage.totalCount)
+        }
+    }
+
     /// Posts initials + city after Give Thanks. Optimistically updates local cache.
     func postGiveThanks() async {
-        guard let profile = storage.userProfile else { return }
+        guard let profile = storage.userProfile, profile.hasJoinedWall else { return }
 
         let initials = String(profile.initials.prefix(4))
         let city = Self.cityLabel(for: profile)
@@ -51,6 +71,7 @@ final class WallService {
         }
         storage.localWallEntries = cached
         entries = cached
+        communityTotal = max(communityTotal + 1, entries.count, storage.totalCount)
 
         do {
             let saved = try await performInsert(initials: initials, city: city)
@@ -61,6 +82,7 @@ final class WallService {
             }
             storage.localWallEntries = entries
             lastError = nil
+            await fetchEntryCount()
         } catch {
             lastError = error.localizedDescription
         }
@@ -102,6 +124,41 @@ final class WallService {
         let decoder = Self.makeDecoder()
         let remote = try decoder.decode([RemoteWallEntry].self, from: data)
         return remote.map(\.asWallEntry)
+    }
+
+    private func performCount() async throws -> Int {
+        var components = URLComponents(
+            url: SupabaseConfig.projectURL.appendingPathComponent("rest/v1/wall_entries"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+        ]
+        guard let url = components.url else {
+            throw WallServiceError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        applyCommonHeaders(to: &request)
+        request.setValue("count=exact", forHTTPHeaderField: "Prefer")
+        request.setValue("0-0", forHTTPHeaderField: "Range")
+
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw WallServiceError.invalidResponse
+        }
+        guard (200...299).contains(http.statusCode) else {
+            throw WallServiceError.server("HTTP \(http.statusCode)")
+        }
+
+        // Content-Range: 0-0/12345 or */12345
+        if let range = http.value(forHTTPHeaderField: "Content-Range"),
+           let total = range.split(separator: "/").last,
+           let count = Int(total) {
+            return count
+        }
+        return 0
     }
 
     private func performInsert(initials: String, city: String) async throws -> WallEntry {

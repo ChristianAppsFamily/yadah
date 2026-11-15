@@ -9,12 +9,12 @@ struct ContentView: View {
         Group {
             if showSplash {
                 SplashView {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showSplash = false
+                    }
                     Task {
                         if !viewModel.storage.hasOnboarded {
                             await viewModel.requestATTAfterSplash()
-                        }
-                        withAnimation(.easeInOut(duration: 0.35)) {
-                            showSplash = false
                         }
                     }
                 }
@@ -36,7 +36,7 @@ struct ContentView: View {
         }
         .environment(\.themePalette, viewModel.themePalette)
         .preferredColorScheme(viewModel.preferredColorScheme)
-        .animation(.easeInOut(duration: 0.4), value: viewModel.storage.hasOnboarded)
+        .animation(.easeInOut(duration: 0.35), value: viewModel.storage.hasOnboarded)
         .animation(.easeInOut(duration: 0.3), value: viewModel.showMoment)
         .animation(.easeInOut(duration: 0.3), value: viewModel.showAmen)
         .task {
@@ -60,42 +60,17 @@ struct ContentView: View {
 
 struct OnboardingFlow: View {
     let viewModel: AppViewModel
-    @State private var step: OnboardingStep = .profile
 
     var body: some View {
-        Group {
-            switch step {
-            case .profile:
-                ProfileSetupView(initialProfile: viewModel.storage.userProfile) { name, city, state, wallInitials in
-                    viewModel.saveProfile(
-                        name: name,
-                        city: city,
-                        state: state,
-                        wallInitials: wallInitials
-                    )
-                    withAnimation(.easeInOut) { step = .reminderPrompt }
-                }
-
-            case .reminderPrompt:
-                ReminderPromptView(
-                    onBack: {
-                        withAnimation(.easeInOut) { step = .profile }
-                    },
-                    onYes: {
-                        await viewModel.finishOnboarding(openSettings: true)
-                    },
-                    onNo: {
-                        await viewModel.finishOnboarding(openSettings: false)
-                    }
-                )
+        ReminderPromptView(
+            onYes: {
+                viewModel.finishOnboarding(openSettings: true, requestNotifications: true)
+            },
+            onNo: {
+                viewModel.finishOnboarding(openSettings: false, requestNotifications: false)
             }
-        }
-        .transition(.opacity)
+        )
     }
-}
-
-nonisolated enum OnboardingStep: Sendable {
-    case profile, reminderPrompt
 }
 
 struct MainTabView: View {
@@ -125,9 +100,6 @@ struct MainTabView: View {
         }
         .task {
             await viewModel.prepareAdsAfterOnboarding()
-            if !viewModel.notificationService.isAuthorized {
-                await viewModel.requestNotificationsAfterOnboarding()
-            }
             RateAppService.recordVisitAndMaybePrompt()
         }
     }

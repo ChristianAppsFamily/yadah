@@ -18,6 +18,7 @@ struct SettingsView: View {
                 )
 
                 VStack(spacing: 28) {
+                    profileSection
                     upgradeSection
                     remindersSection
                     themesSection
@@ -35,6 +36,35 @@ struct SettingsView: View {
         }
         .task {
             await viewModel.storeKit.loadProducts()
+        }
+    }
+
+    private var profileSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            SettingsSectionHeader(title: "Thank You Wall Profile")
+
+            if viewModel.focusProfileInSettings {
+                Text("Add your name and city to join the wall.")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.warmGray)
+            } else if let profile = viewModel.storage.userProfile, profile.hasJoinedWall {
+                Text("\(profile.name) · \(WallService.cityLabel(for: profile))")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.warmGray)
+            }
+
+            ProfileSetupView(
+                initialProfile: viewModel.storage.userProfile,
+                embeddedInSettings: true,
+                saveButtonTitle: viewModel.hasJoinedWall ? "Save Profile" : "Join the Wall"
+            ) { name, city, state, wallInitials in
+                viewModel.saveProfile(
+                    name: name,
+                    city: city,
+                    state: state,
+                    wallInitials: wallInitials
+                )
+            }
         }
     }
 
