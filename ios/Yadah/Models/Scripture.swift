@@ -26,7 +26,7 @@ extension Scripture {
 
     static func randomForToday() -> Scripture {
         let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 1
-        let index = dayOfYear % library.count
+        let index = (dayOfYear - 1) % library.count
         return library[index]
     }
 
@@ -40,10 +40,10 @@ extension Scripture {
 
     private static func loadLibrary() -> [Scripture] {
         guard let url = Bundle.main.url(
-            forResource: "thanksgiving_verses_180",
+            forResource: "thanksgiving_verses_KJV_filtered",
             withExtension: "json"
         ) else {
-            assertionFailure("Missing thanksgiving_verses_180.json in app bundle")
+            assertionFailure("Missing thanksgiving_verses_KJV_filtered.json in app bundle")
             return []
         }
 
@@ -60,7 +60,7 @@ extension Scripture {
                 )
             }
         } catch {
-            assertionFailure("Failed to decode thanksgiving_verses_180.json: \(error)")
+            assertionFailure("Failed to decode thanksgiving_verses_KJV_filtered.json: \(error)")
             return []
         }
     }

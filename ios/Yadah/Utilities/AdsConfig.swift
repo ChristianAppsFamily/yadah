@@ -14,10 +14,10 @@ enum AdsConfig {
     private static let testAppID = "ca-app-pub-3940256099942544~1458002511"
     private static let testBannerUnitID = "ca-app-pub-3940256099942544/2934735716"
 
-    /// Replace with Yadah's AdMob iOS app ID before setting `useTestAds = false`.
-    private static let productionAppID = "ca-app-pub-xxxxxxxxxxxxxxxx~xxxxxxxxxx"
-    /// Replace with Yadah's AdMob iOS banner unit ID before setting `useTestAds = false`.
-    private static let productionBannerUnitID = "ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx"
+    /// Yadah AdMob iOS app ID.
+    private static let productionAppID = "ca-app-pub-3002325591150738~6846682083"
+    /// Yadah Bottom Banner ad unit ID.
+    private static let productionBannerUnitID = "ca-app-pub-3002325591150738/1064531505"
 
     static var appID: String {
         useTestAds ? testAppID : productionAppID

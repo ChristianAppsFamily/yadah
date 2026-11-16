@@ -24,7 +24,7 @@ struct ThankYouWallView: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 8) {
-                YadahWordmark(size: .system(.title2, design: .serif, weight: .bold))
+                YadahWordmark()
 
                 Text(thanksTotalLabel)
                     .font(.system(size: 14, weight: .medium, design: .rounded))

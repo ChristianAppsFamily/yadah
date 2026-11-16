@@ -18,8 +18,8 @@ struct YadahTests {
         #expect(AppThemeOption.slateDawn.prefersLightColorScheme == true)
     }
 
-    @Test func scriptureLibraryHasFifteenVerses() {
-        #expect(Scripture.library.count == 15)
+    @Test func scriptureLibraryHasSeventyEightVerses() {
+        #expect(Scripture.library.count == 78)
     }
 
     @Test func momentPromptLibraryHasThirtyOneEntries() {

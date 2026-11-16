@@ -8,7 +8,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 28) {
-                YadahWordmark(size: .system(.title2, design: .serif, weight: .bold))
+                YadahWordmark()
                     .padding(.top, 12)
                     .padding(.horizontal, 24)
 
@@ -60,7 +60,7 @@ struct SettingsView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(theme.skyGradient)
+                    .background(theme.accent)
                     .clipShape(.capsule)
             }
 
@@ -91,7 +91,7 @@ struct SettingsView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(theme.skyGradient)
+                    .background(theme.accent)
                     .clipShape(.capsule)
                 }
             }

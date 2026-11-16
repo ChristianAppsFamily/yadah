@@ -283,6 +283,7 @@ class AppViewModel {
 
     func completeAmen() {
         showAmen = false
+        selectedTab = .wall
     }
 
     func purchaseRemoveAds() async {

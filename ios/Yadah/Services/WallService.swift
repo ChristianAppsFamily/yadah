@@ -14,13 +14,17 @@ final class WallService {
     init(storage: StorageService, session: URLSession = .shared) {
         self.storage = storage
         self.session = session
-        self.entries = storage.localWallEntries
-        self.communityTotal = max(storage.localWallEntries.count, storage.totalCount)
+        let today = Self.todaysEntries(from: storage.localWallEntries)
+        self.entries = today
+        self.communityTotal = today.count
+        if today != storage.localWallEntries {
+            storage.localWallEntries = today
+        }
     }
 
-    /// Display total: prefer remote community count, never below local activity.
+    /// Today's wall total: remote day count, never below what's on screen.
     var displayedThanksTotal: Int {
-        max(communityTotal, entries.count, storage.totalCount)
+        max(communityTotal, entries.count)
     }
 
     func refresh() async {
@@ -33,11 +37,14 @@ final class WallService {
     func fetchLatest(limit: Int = 50) async {
         do {
             let remote = try await performFetch(limit: limit)
-            entries = remote
-            storage.localWallEntries = remote
+            let today = Self.todaysEntries(from: remote)
+            entries = today
+            storage.localWallEntries = today
             lastError = nil
         } catch {
-            entries = storage.localWallEntries
+            let today = Self.todaysEntries(from: storage.localWallEntries)
+            entries = today
+            storage.localWallEntries = today
             lastError = error.localizedDescription
         }
     }
@@ -45,9 +52,9 @@ final class WallService {
     func fetchEntryCount() async {
         do {
             let count = try await performCount()
-            communityTotal = max(count, entries.count, storage.totalCount)
+            communityTotal = max(count, entries.count)
         } catch {
-            communityTotal = max(communityTotal, entries.count, storage.totalCount)
+            communityTotal = max(communityTotal, entries.count)
         }
     }
 
@@ -64,28 +71,45 @@ final class WallService {
             timestamp: Date()
         )
 
-        var cached = storage.localWallEntries
+        var cached = Self.todaysEntries(from: storage.localWallEntries)
         cached.insert(optimistic, at: 0)
         if cached.count > 50 {
             cached = Array(cached.prefix(50))
         }
         storage.localWallEntries = cached
         entries = cached
-        communityTotal = max(communityTotal + 1, entries.count, storage.totalCount)
+        communityTotal = max(communityTotal + 1, entries.count)
 
         do {
             let saved = try await performInsert(initials: displayName, city: city)
-            if let index = entries.firstIndex(where: { $0.id == optimistic.id }) {
-                entries[index] = saved
+            var next = Self.todaysEntries(from: entries)
+            if let index = next.firstIndex(where: { $0.id == optimistic.id }) {
+                next[index] = saved
             } else {
-                entries.insert(saved, at: 0)
+                next.insert(saved, at: 0)
             }
-            storage.localWallEntries = entries
+            next = Self.todaysEntries(from: next)
+            entries = next
+            storage.localWallEntries = next
             lastError = nil
             await fetchEntryCount()
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    static func todaysEntries(from entries: [WallEntry]) -> [WallEntry] {
+        let start = Calendar.current.startOfDay(for: Date())
+        return entries
+            .filter { $0.timestamp >= start }
+            .sorted { $0.timestamp > $1.timestamp }
+    }
+
+    private static func startOfTodayISO8601() -> String {
+        let start = Calendar.current.startOfDay(for: Date())
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: start)
     }
 
     static func cityLabel(for profile: UserProfile) -> String {
@@ -117,8 +141,10 @@ final class WallService {
             url: SupabaseConfig.projectURL.appendingPathComponent("rest/v1/wall_entries"),
             resolvingAgainstBaseURL: false
         )!
+        let startOfToday = Self.startOfTodayISO8601()
         components.queryItems = [
             URLQueryItem(name: "select", value: "id,initials,city,created_at"),
+            URLQueryItem(name: "created_at", value: "gte.\(startOfToday)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: String(limit)),
         ]
@@ -143,8 +169,10 @@ final class WallService {
             url: SupabaseConfig.projectURL.appendingPathComponent("rest/v1/wall_entries"),
             resolvingAgainstBaseURL: false
         )!
+        let startOfToday = Self.startOfTodayISO8601()
         components.queryItems = [
             URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "created_at", value: "gte.\(startOfToday)"),
         ]
         guard let url = components.url else {
             throw WallServiceError.invalidURL

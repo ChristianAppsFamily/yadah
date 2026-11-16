@@ -8,7 +8,7 @@ struct HomeView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 28) {
-                    YadahWordmark(size: .system(.title, design: .serif, weight: .bold))
+                    YadahWordmark()
                         .padding(.top, 12)
 
                     VStack(spacing: 20) {
