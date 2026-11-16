@@ -37,33 +37,41 @@ struct SettingsView: View {
         .task {
             await viewModel.storeKit.loadProducts()
         }
+        .onChange(of: viewModel.focusProfileInSettings) { _, focused in
+            if focused {
+                viewModel.showProfileSheet = true
+            }
+        }
+        .sheet(isPresented: $viewModel.showProfileSheet, onDismiss: {
+            viewModel.focusProfileInSettings = false
+        }) {
+            ProfileSheetView(viewModel: viewModel)
+                .environment(\.themePalette, theme)
+        }
     }
 
     private var profileSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            SettingsSectionHeader(title: "Thank You Wall Profile")
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                viewModel.openProfileSheet()
+            } label: {
+                Text(viewModel.hasJoinedWall ? "Edit Profile" : "Create Profile")
+                    .font(.system(.body, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(theme.skyGradient)
+                    .clipShape(.capsule)
+            }
 
-            if viewModel.focusProfileInSettings {
-                Text("Add your name and city to join the wall.")
-                    .font(.subheadline)
-                    .foregroundStyle(theme.warmGray)
-            } else if let profile = viewModel.storage.userProfile, profile.hasJoinedWall {
+            if let profile = viewModel.storage.userProfile, profile.hasJoinedWall {
                 Text("\(profile.name) · \(WallService.cityLabel(for: profile))")
                     .font(.subheadline)
                     .foregroundStyle(theme.warmGray)
-            }
-
-            ProfileSetupView(
-                initialProfile: viewModel.storage.userProfile,
-                embeddedInSettings: true,
-                saveButtonTitle: viewModel.hasJoinedWall ? "Save Profile" : "Join the Wall"
-            ) { name, city, state, wallInitials in
-                viewModel.saveProfile(
-                    name: name,
-                    city: city,
-                    state: state,
-                    wallInitials: wallInitials
-                )
+            } else if viewModel.focusProfileInSettings {
+                Text("Add your name and city to join the wall.")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.warmGray)
             }
         }
     }
@@ -109,32 +117,6 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             SettingsSectionHeader(title: "Reminders")
 
-            HStack(spacing: 6) {
-                Image(systemName: "pencil.circle.fill")
-                    .foregroundStyle(theme.accentDark)
-                Text("Tap a time to edit.")
-                    .font(.caption)
-                    .foregroundStyle(theme.warmGray)
-            }
-
-            if !viewModel.notificationService.isAuthorized {
-                Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        openURL(url)
-                    }
-                } label: {
-                    Text("Enable Notifications in Settings")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(theme.accentDark)
-                }
-            }
-
-            if !viewModel.storage.isPro {
-                Text("Free: 1 reminder · Pro: up to 5 custom times")
-                    .font(.caption)
-                    .foregroundStyle(theme.warmGray)
-            }
-
             ForEach(viewModel.storage.reminderTimes) { reminder in
                 ReminderRow(
                     reminder: reminder,
@@ -149,6 +131,26 @@ struct SettingsView: View {
                         viewModel.showPaywall = true
                     }
                 )
+            }
+
+            if viewModel.storage.isPro {
+                Button {
+                    viewModel.addCustomReminder()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add reminder")
+                            .font(.system(.body, weight: .semibold))
+                    }
+                    .foregroundStyle(theme.accentDark)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(theme.accent, lineWidth: 1.5)
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -273,6 +275,53 @@ struct SettingsView: View {
     private func open(_ string: String) {
         guard let url = URL(string: string) else { return }
         openURL(url)
+    }
+}
+
+struct ProfileSheetView: View {
+    @Bindable var viewModel: AppViewModel
+    @Environment(\.themePalette) private var theme
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("This profile is for the Thank You Wall. Your photo stays on this device.")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.warmGray)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    ProfileSetupView(
+                        initialProfile: viewModel.storage.userProfile,
+                        embeddedInSettings: true,
+                        saveButtonTitle: viewModel.hasJoinedWall ? "Save Profile" : "Create Profile"
+                    ) { name, country, city, state, photoFileName in
+                        viewModel.saveProfile(
+                            name: name,
+                            country: country,
+                            city: city,
+                            state: state,
+                            localPhotoFileName: photoFileName
+                        )
+                        dismiss()
+                    }
+                }
+                .padding(24)
+            }
+            .background {
+                theme.background.ignoresSafeArea()
+            }
+            .navigationTitle(viewModel.hasJoinedWall ? "Edit Profile" : "Create Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

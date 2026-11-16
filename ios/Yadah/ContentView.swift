@@ -21,7 +21,7 @@ struct ContentView: View {
             } else if !viewModel.storage.hasOnboarded {
                 OnboardingFlow(viewModel: viewModel)
             } else if viewModel.showMoment {
-                MomentView(scripture: viewModel.currentScripture) {
+                MomentView {
                     viewModel.completeMoment()
                 }
                 .transition(.opacity)
@@ -36,9 +36,9 @@ struct ContentView: View {
         }
         .environment(\.themePalette, viewModel.themePalette)
         .preferredColorScheme(viewModel.preferredColorScheme)
-        .animation(.easeInOut(duration: 0.35), value: viewModel.storage.hasOnboarded)
-        .animation(.easeInOut(duration: 0.3), value: viewModel.showMoment)
-        .animation(.easeInOut(duration: 0.3), value: viewModel.showAmen)
+        .animation(.easeInOut(duration: 0.4), value: viewModel.storage.hasOnboarded)
+        .animation(.easeInOut(duration: 0.5), value: viewModel.showMoment)
+        .animation(.easeInOut(duration: 0.55), value: viewModel.showAmen)
         .task {
             await viewModel.setup()
         }
@@ -92,6 +92,8 @@ struct MainTabView: View {
             }
         }
         .tint(theme.tabSelected)
+        .toolbarBackground(theme.background, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .onAppear {
             applyTabBarAppearance(theme: theme)
         }
@@ -122,5 +124,41 @@ struct MainTabView: View {
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+
+        for tabBar in existingTabBars() {
+            tabBar.standardAppearance = appearance
+            tabBar.scrollEdgeAppearance = appearance
+            tabBar.tintColor = selected
+            tabBar.unselectedItemTintColor = unselected
+            tabBar.barTintColor = UIColor(theme.background)
+            tabBar.isTranslucent = false
+            tabBar.setNeedsLayout()
+            tabBar.layoutIfNeeded()
+        }
+    }
+
+    private func existingTabBars() -> [UITabBar] {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+        else {
+            return []
+        }
+
+        var bars: [UITabBar] = []
+        for window in windowScene.windows {
+            collectTabBars(from: window, into: &bars)
+        }
+        return bars
+    }
+
+    private func collectTabBars(from view: UIView, into bars: inout [UITabBar]) {
+        if let tabBar = view as? UITabBar {
+            bars.append(tabBar)
+        }
+        for subview in view.subviews {
+            collectTabBars(from: subview, into: &bars)
+        }
     }
 }

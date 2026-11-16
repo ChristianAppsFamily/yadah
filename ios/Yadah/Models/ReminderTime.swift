@@ -25,7 +25,7 @@ nonisolated struct ReminderTime: Identifiable, Codable, Sendable, Hashable {
 }
 
 extension ReminderTime {
-    /// Free tier starts with one reminder enabled; Pro can enable up to five.
+    /// Free tier starts with one reminder enabled; Pro can enable all presets and add custom times.
     static let defaults: [ReminderTime] = [
         ReminderTime(id: "morning", hour: 7, minute: 0, name: "Morning Awakening", isEnabled: true),
         ReminderTime(id: "start", hour: 9, minute: 0, name: "Start of the Day", isEnabled: false),

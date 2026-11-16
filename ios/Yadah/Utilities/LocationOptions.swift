@@ -2,6 +2,22 @@ import Foundation
 
 enum LocationOptions {
     static let writeMyOwn = "Write my own"
+    static let unitedStates = "United States"
+
+    static let countries: [String] = [
+        "United States", "Canada", "United Kingdom", "Australia", "New Zealand",
+        "Ireland", "South Africa", "Nigeria", "Kenya", "Ghana", "India",
+        "Philippines", "Singapore", "Malaysia", "Indonesia", "Japan",
+        "South Korea", "China", "Taiwan", "Hong Kong", "Brazil", "Mexico",
+        "Argentina", "Colombia", "Chile", "Peru", "Germany", "France",
+        "Spain", "Italy", "Portugal", "Netherlands", "Belgium", "Switzerland",
+        "Austria", "Sweden", "Norway", "Denmark", "Finland", "Poland",
+        "Romania", "Ukraine", "Russia", "Turkey", "Israel", "United Arab Emirates",
+        "Saudi Arabia", "Egypt", "Morocco", "Jamaica", "Trinidad and Tobago",
+        "Bahamas", "Barbados", "Dominican Republic", "Puerto Rico", "Costa Rica",
+        "Panama", "Guatemala", "Honduras", "El Salvador", "Nicaragua",
+        writeMyOwn
+    ]
 
     static let usStates: [String] = [
         "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
@@ -28,4 +44,9 @@ enum LocationOptions {
         "San Jose", "Seattle", "St. Louis", "Tampa", "Washington",
         writeMyOwn
     ]
+
+    static func isUnitedStates(_ country: String) -> Bool {
+        let c = country.trimmingCharacters(in: .whitespacesAndNewlines)
+        return c == unitedStates || c == "USA" || c == "US"
+    }
 }

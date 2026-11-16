@@ -19,16 +19,30 @@ class StorageService {
         didSet { defaults.set(selectedTheme.rawValue, forKey: "yadah_selectedTheme") }
     }
 
+    /// Stored so joining/saving wall profile refreshes Thank You Wall and Settings.
+    var userProfile: UserProfile? {
+        didSet {
+            let data = try? JSONEncoder().encode(userProfile)
+            defaults.set(data, forKey: "yadah_userProfile")
+        }
+    }
+
     init() {
         hasOnboarded = defaults.bool(forKey: "yadah_hasOnboarded")
         hasCompletedSetup = defaults.bool(forKey: "yadah_hasCompletedSetup")
         selectedTheme = Self.loadSelectedTheme(from: UserDefaults.standard)
+        userProfile = Self.loadUserProfile(from: UserDefaults.standard)
     }
 
     private static func loadSelectedTheme(from defaults: UserDefaults) -> AppThemeOption {
         guard let raw = defaults.string(forKey: "yadah_selectedTheme") else { return .sky }
         if raw == "softCream" { return .day }
         return AppThemeOption(rawValue: raw) ?? .sky
+    }
+
+    private static func loadUserProfile(from defaults: UserDefaults) -> UserProfile? {
+        guard let data = defaults.data(forKey: "yadah_userProfile") else { return nil }
+        return try? JSONDecoder().decode(UserProfile.self, from: data)
     }
 
     var verseMode: VerseMode {
@@ -67,17 +81,6 @@ class StorageService {
 
     var adsHidden: Bool {
         hasRemovedAds || isPro
-    }
-
-    var userProfile: UserProfile? {
-        get {
-            guard let data = defaults.data(forKey: "yadah_userProfile") else { return nil }
-            return try? JSONDecoder().decode(UserProfile.self, from: data)
-        }
-        set {
-            let data = try? JSONEncoder().encode(newValue)
-            defaults.set(data, forKey: "yadah_userProfile")
-        }
     }
 
     var reminderTimes: [ReminderTime] {
@@ -160,11 +163,12 @@ class StorageService {
         totalCount += 1
     }
 
-    /// Caps enabled reminders for free vs Pro. Does not force-enable when the user turns all off.
+    /// Caps enabled reminders for free. Pro has no enable cap. Does not force-enable when the user turns all off.
     func normalizeReminderLimits(isPro: Bool) {
+        guard !isPro else { return }
         var times = reminderTimes
         let enabledIndexes = times.indices.filter { times[$0].isEnabled }
-        let maxAllowed = isPro ? 5 : 1
+        let maxAllowed = 1
         guard enabledIndexes.count > maxAllowed else { return }
         for index in enabledIndexes.dropFirst(maxAllowed) {
             times[index].isEnabled = false

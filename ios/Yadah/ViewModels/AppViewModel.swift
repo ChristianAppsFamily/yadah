@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @Observable
 @MainActor
@@ -16,6 +17,7 @@ class AppViewModel {
     var adsPrepared = false
     /// When true, Settings should emphasize the profile section (from Join the wall).
     var focusProfileInSettings = false
+    var showProfileSheet = false
 
     init() {
         let storage = StorageService()
@@ -35,7 +37,7 @@ class AppViewModel {
     }
 
     var maxReminders: Int {
-        storage.isPro ? 5 : 1
+        storage.isPro ? Int.max : 1
     }
 
     var hasJoinedWall: Bool {
@@ -77,7 +79,10 @@ class AppViewModel {
     }
 
     func requestNotificationsAfterOnboarding() async {
-        _ = await requestNotificationPermission()
+        let granted = await requestNotificationPermission()
+        if !granted {
+            openSystemSettings()
+        }
     }
 
     func requestNotificationPermission() async -> Bool {
@@ -86,6 +91,11 @@ class AppViewModel {
             notificationService.scheduleNotifications(for: storage.reminderTimes)
         }
         return granted
+    }
+
+    func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 
     func completeOnboarding() {
@@ -111,17 +121,52 @@ class AppViewModel {
 
     func openWallJoinInSettings() {
         focusProfileInSettings = true
+        showProfileSheet = true
         selectedTab = .settings
     }
 
-    func saveProfile(name: String, city: String, state: String, wallInitials: String? = nil) {
+    func openProfileSheet() {
+        showProfileSheet = true
+    }
+
+    func saveProfile(
+        name: String,
+        country: String,
+        city: String,
+        state: String,
+        localPhotoFileName: String? = nil
+    ) {
         storage.userProfile = UserProfile(
             name: name,
+            country: country,
             city: city,
             state: state,
-            wallInitials: wallInitials
+            localPhotoFileName: localPhotoFileName
         )
         focusProfileInSettings = false
+        showProfileSheet = false
+    }
+
+    func addCustomReminder() {
+        guard storage.isPro else {
+            showPaywall = true
+            return
+        }
+
+        let calendar = Calendar.current
+        let nextHour = calendar.component(.hour, from: Date().addingTimeInterval(3600)) % 24
+        let customCount = storage.reminderTimes.filter { $0.id.hasPrefix("custom-") }.count + 1
+        let reminder = ReminderTime(
+            id: "custom-\(UUID().uuidString)",
+            hour: nextHour,
+            minute: 0,
+            name: "Custom Reminder \(customCount)",
+            isEnabled: true
+        )
+        var times = storage.reminderTimes
+        times.append(reminder)
+        storage.reminderTimes = times
+        notificationService.scheduleNotifications(for: storage.reminderTimes)
     }
 
     func setReminderEnabled(id: String, isEnabled: Bool) {
@@ -130,15 +175,37 @@ class AppViewModel {
         if current.isEnabled == isEnabled { return }
 
         if isEnabled {
-            let enabledCount = storage.reminderTimes.filter(\.isEnabled).count
-            if enabledCount >= maxReminders {
-                showPaywall = true
+            Task {
+                await enableReminderIfAuthorized(id: id)
+            }
+            return
+        }
+
+        var times = storage.reminderTimes
+        times[index].isEnabled = false
+        storage.reminderTimes = times
+        notificationService.scheduleNotifications(for: storage.reminderTimes)
+    }
+
+    private func enableReminderIfAuthorized(id: String) async {
+        await notificationService.checkAuthorizationStatus()
+        if !notificationService.isAuthorized {
+            let granted = await requestNotificationPermission()
+            if !granted {
+                openSystemSettings()
                 return
             }
         }
 
+        let enabledCount = storage.reminderTimes.filter(\.isEnabled).count
+        if enabledCount >= maxReminders {
+            showPaywall = true
+            return
+        }
+
+        guard let index = storage.reminderTimes.firstIndex(where: { $0.id == id }) else { return }
         var times = storage.reminderTimes
-        times[index].isEnabled = isEnabled
+        times[index].isEnabled = true
         storage.reminderTimes = times
         notificationService.scheduleNotifications(for: storage.reminderTimes)
     }

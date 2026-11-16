@@ -5,6 +5,8 @@ nonisolated enum AppThemeOption: String, CaseIterable, Codable, Sendable, Identi
     case day
     case deepNavy
     case warmGold
+    case oliveGrove
+    case slateDawn
 
     var id: String { rawValue }
 
@@ -14,19 +16,21 @@ nonisolated enum AppThemeOption: String, CaseIterable, Codable, Sendable, Identi
         case .day: return "Day"
         case .deepNavy: return "Deep Navy"
         case .warmGold: return "Warm Gold"
+        case .oliveGrove: return "Olive Grove"
+        case .slateDawn: return "Slate Dawn"
         }
     }
 
     var isProOnly: Bool {
         switch self {
         case .sky, .day: return false
-        case .deepNavy, .warmGold: return true
+        case .deepNavy, .warmGold, .oliveGrove, .slateDawn: return true
         }
     }
 
     var prefersLightColorScheme: Bool {
         switch self {
-        case .sky, .day, .warmGold: return true
+        case .sky, .day, .warmGold, .oliveGrove, .slateDawn: return true
         case .deepNavy: return false
         }
     }
@@ -96,6 +100,38 @@ nonisolated enum AppThemeOption: String, CaseIterable, Codable, Sendable, Identi
                 splashBackground: Color(red: 0.18, green: 0.12, blue: 0.05),
                 tabSelected: Color(red: 0.28, green: 0.18, blue: 0.08),
                 tabUnselected: Color(red: 0.62, green: 0.52, blue: 0.38)
+            )
+        case .oliveGrove:
+            return ThemePalette(
+                navy: Color(red: 0.22, green: 0.28, blue: 0.18),
+                accent: Color(red: 0.55, green: 0.62, blue: 0.38),
+                accentDark: Color(red: 0.42, green: 0.48, blue: 0.28),
+                accentLight: Color(red: 0.78, green: 0.82, blue: 0.62),
+                warmGray: Color(red: 0.48, green: 0.50, blue: 0.42),
+                lightBorder: Color(red: 0.86, green: 0.88, blue: 0.80),
+                background: Color(red: 0.97, green: 0.98, blue: 0.94),
+                momentTop: Color(red: 0.78, green: 0.82, blue: 0.58),
+                momentMid: Color(red: 0.55, green: 0.62, blue: 0.38),
+                momentBottom: Color(red: 0.40, green: 0.46, blue: 0.28),
+                splashBackground: Color(red: 0.14, green: 0.18, blue: 0.10),
+                tabSelected: Color(red: 0.22, green: 0.28, blue: 0.18),
+                tabUnselected: Color(red: 0.55, green: 0.58, blue: 0.48)
+            )
+        case .slateDawn:
+            return ThemePalette(
+                navy: Color(red: 0.18, green: 0.24, blue: 0.32),
+                accent: Color(red: 0.48, green: 0.58, blue: 0.68),
+                accentDark: Color(red: 0.36, green: 0.45, blue: 0.55),
+                accentLight: Color(red: 0.72, green: 0.78, blue: 0.84),
+                warmGray: Color(red: 0.48, green: 0.52, blue: 0.58),
+                lightBorder: Color(red: 0.84, green: 0.87, blue: 0.90),
+                background: Color(red: 0.96, green: 0.97, blue: 0.98),
+                momentTop: Color(red: 0.68, green: 0.74, blue: 0.82),
+                momentMid: Color(red: 0.48, green: 0.58, blue: 0.68),
+                momentBottom: Color(red: 0.34, green: 0.42, blue: 0.52),
+                splashBackground: Color(red: 0.10, green: 0.14, blue: 0.20),
+                tabSelected: Color(red: 0.18, green: 0.24, blue: 0.32),
+                tabUnselected: Color(red: 0.55, green: 0.60, blue: 0.66)
             )
         }
     }

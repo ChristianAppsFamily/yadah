@@ -1,29 +1,36 @@
+import PhotosUI
 import SwiftUI
+import UIKit
 
 struct ProfileSetupView: View {
     @Environment(\.themePalette) private var theme
     let initialProfile: UserProfile?
     var embeddedInSettings: Bool = false
     var saveButtonTitle: String = "Done"
-    let onDone: (String, String, String, String?) -> Void
+    let onDone: (String, String, String, String, String?) -> Void
 
     @State private var firstName: String
-    @State private var initials: String
+    @State private var selectedCountry: String
+    @State private var customCountry: String
     @State private var selectedCity: String
     @State private var customCity: String
     @State private var selectedState: String
     @State private var customState: String
+    @State private var didJustSave = false
+    @State private var photoItem: PhotosPickerItem?
+    @State private var photoImage: UIImage?
+    @State private var photoFileName: String?
     @FocusState private var focusedField: Field?
 
     private enum Field {
-        case firstName, initials, customCity, customState
+        case firstName, customCountry, customCity, customState
     }
 
     init(
         initialProfile: UserProfile? = nil,
         embeddedInSettings: Bool = false,
         saveButtonTitle: String = "Done",
-        onDone: @escaping (String, String, String, String?) -> Void
+        onDone: @escaping (String, String, String, String, String?) -> Void
     ) {
         self.initialProfile = initialProfile
         self.embeddedInSettings = embeddedInSettings
@@ -32,18 +39,25 @@ struct ProfileSetupView: View {
 
         let draft = Self.draft(from: initialProfile)
         _firstName = State(initialValue: draft.firstName)
-        _initials = State(initialValue: draft.initials)
+        _selectedCountry = State(initialValue: draft.selectedCountry)
+        _customCountry = State(initialValue: draft.customCountry)
         _selectedCity = State(initialValue: draft.selectedCity)
         _customCity = State(initialValue: draft.customCity)
         _selectedState = State(initialValue: draft.selectedState)
         _customState = State(initialValue: draft.customState)
+        _photoFileName = State(initialValue: draft.photoFileName)
+        _photoImage = State(initialValue: ProfilePhotoStore.loadImage(fileName: draft.photoFileName))
+    }
+
+    private var isUSA: Bool {
+        LocationOptions.isUnitedStates(resolvedCountry)
     }
 
     var body: some View {
         VStack(spacing: embeddedInSettings ? 16 : 0) {
             if embeddedInSettings {
-                formFields
-                SkyBlueButton(title: saveButtonTitle) {
+                formContent
+                SkyBlueButton(title: didJustSave ? "Saved" : saveButtonTitle) {
                     save()
                 }
             } else {
@@ -63,11 +77,12 @@ struct ProfileSetupView: View {
                                 .multilineTextAlignment(.center)
                         }
 
-                        formFields
+                        formContent
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
                 }
+                .scrollDismissesKeyboard(.interactively)
 
                 SkyBlueButton(title: saveButtonTitle) {
                     save()
@@ -76,96 +91,209 @@ struct ProfileSetupView: View {
                 .padding(.bottom, 32)
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            focusedField = nil
+        }
+        .scrollDismissesKeyboard(.interactively)
         .background {
             if !embeddedInSettings {
                 theme.background.ignoresSafeArea()
             }
         }
-    }
-
-    private var formFields: some View {
-        VStack(spacing: 14) {
-            focusableField(placeholder: "First Name only", text: $firstName, field: .firstName)
-                .textContentType(.givenName)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .initials }
-
-            focusableField(placeholder: "or Initials", text: $initials, field: .initials)
-                .textInputAutocapitalization(.characters)
-                .submitLabel(.done)
-                .onSubmit { focusedField = nil }
-                .onChange(of: initials) { _, newValue in
-                    if newValue.count > 3 {
-                        initials = String(newValue.prefix(3))
-                    }
-                }
-
-            locationMenu(
-                title: "City",
-                selection: $selectedCity,
-                options: LocationOptions.usCities,
-                customText: $customCity,
-                customField: .customCity
-            )
-
-            locationMenu(
-                title: "State",
-                selection: $selectedState,
-                options: LocationOptions.usStates,
-                customText: $customState,
-                customField: .customState
-            )
+        .onChange(of: photoItem) { _, newItem in
+            Task {
+                await loadPhoto(from: newItem)
+            }
+        }
+        .onChange(of: selectedCountry) { _, _ in
+            if !isUSA {
+                selectedCity = LocationOptions.writeMyOwn
+                selectedState = LocationOptions.writeMyOwn
+            }
         }
     }
 
+    private var formContent: some View {
+        VStack(spacing: 14) {
+            photoPickerRow
+
+            focusableField(placeholder: "First name", text: $firstName, field: .firstName)
+                .textContentType(.givenName)
+                .submitLabel(.done)
+                .onSubmit { focusedField = nil }
+
+            locationMenu(
+                title: "Country",
+                selection: $selectedCountry,
+                options: LocationOptions.countries,
+                customText: $customCountry,
+                customField: .customCountry
+            )
+
+            if isUSA {
+                locationMenu(
+                    title: "City",
+                    selection: $selectedCity,
+                    options: LocationOptions.usCities,
+                    customText: $customCity,
+                    customField: .customCity
+                )
+
+                locationMenu(
+                    title: "State",
+                    selection: $selectedState,
+                    options: LocationOptions.usStates,
+                    customText: $customState,
+                    customField: .customState
+                )
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("City")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(theme.warmGray)
+                    focusableField(placeholder: "City", text: $customCity, field: .customCity)
+                        .textContentType(.addressCity)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("State / Province / Region")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(theme.warmGray)
+                    focusableField(placeholder: "State or region", text: $customState, field: .customState)
+                        .textContentType(.addressState)
+                }
+            }
+        }
+    }
+
+    private var photoPickerRow: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(theme.accentLight.opacity(0.55))
+                    .frame(width: 64, height: 64)
+
+                if let photoImage {
+                    Image(uiImage: photoImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 64, height: 64)
+                        .clipShape(.circle)
+                } else {
+                    Image(systemName: "person.fill")
+                        .font(.title2)
+                        .foregroundStyle(theme.navy.opacity(0.55))
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                PhotosPicker(selection: $photoItem, matching: .images) {
+                    Text(photoImage == nil ? "Add photo (optional)" : "Change photo")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(theme.accentDark)
+                }
+
+                if photoImage != nil {
+                    Button("Remove photo") {
+                        ProfilePhotoStore.delete(fileName: photoFileName)
+                        photoFileName = nil
+                        photoImage = nil
+                        photoItem = nil
+                    }
+                    .font(.caption)
+                    .foregroundStyle(theme.warmGray)
+                }
+
+                Text("Stored only on this device.")
+                    .font(.caption2)
+                    .foregroundStyle(theme.warmGray.opacity(0.8))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+    }
+
     private func save() {
+        focusedField = nil
         let trimmedName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedInitials = initials.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayName = !trimmedName.isEmpty
-            ? trimmedName
-            : (!trimmedInitials.isEmpty ? trimmedInitials : "Friend")
-        let wallInitials = !trimmedInitials.isEmpty ? trimmedInitials : nil
-        onDone(displayName, resolvedCity, resolvedState, wallInitials)
+        let displayName = trimmedName.isEmpty ? "Friend" : trimmedName
+        onDone(displayName, resolvedCountry, resolvedCity, resolvedState, photoFileName)
+
+        guard embeddedInSettings else { return }
+        didJustSave = true
+        Task {
+            try? await Task.sleep(for: .seconds(1.6))
+            didJustSave = false
+        }
+    }
+
+    private func loadPhoto(from item: PhotosPickerItem?) async {
+        guard let item else { return }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else { return }
+            await MainActor.run {
+                if let saved = ProfilePhotoStore.saveJPEG(image) {
+                    photoFileName = saved
+                    photoImage = image
+                }
+            }
+        } catch {
+            // Keep existing photo if picker fails.
+        }
     }
 
     private static func draft(from profile: UserProfile?) -> (
         firstName: String,
-        initials: String,
+        selectedCountry: String,
+        customCountry: String,
         selectedCity: String,
         customCity: String,
         selectedState: String,
-        customState: String
+        customState: String,
+        photoFileName: String?
     ) {
         guard let profile else {
             return (
                 "",
+                LocationOptions.unitedStates,
                 "",
                 LocationOptions.usCities.first ?? LocationOptions.writeMyOwn,
                 "",
                 LocationOptions.usStates.first ?? LocationOptions.writeMyOwn,
-                ""
+                "",
+                nil
             )
         }
 
-        let savedInitials = profile.wallInitials?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let savedName = profile.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let firstName: String
-        if savedName.isEmpty || savedName == "Friend" || savedName.caseInsensitiveCompare(savedInitials) == .orderedSame {
-            firstName = ""
-        } else {
-            firstName = savedName
-        }
+        let firstName = (savedName.isEmpty || savedName == "Friend") ? "" : savedName
+        let countryPick = locationDraft(value: profile.country, options: LocationOptions.countries)
+        let isUS = LocationOptions.isUnitedStates(
+            countryPick.selection == LocationOptions.writeMyOwn ? countryPick.custom : countryPick.selection
+        )
 
-        let cityPick = locationDraft(value: profile.city, options: LocationOptions.usCities)
-        let statePick = locationDraft(value: profile.state, options: LocationOptions.usStates)
+        let cityPick: (selection: String, custom: String)
+        let statePick: (selection: String, custom: String)
+        if isUS {
+            cityPick = locationDraft(value: profile.city, options: LocationOptions.usCities)
+            statePick = locationDraft(value: profile.state, options: LocationOptions.usStates)
+        } else {
+            cityPick = (LocationOptions.writeMyOwn, profile.city)
+            statePick = (LocationOptions.writeMyOwn, profile.state)
+        }
 
         return (
             firstName,
-            savedInitials,
+            countryPick.selection,
+            countryPick.custom,
             cityPick.selection,
             cityPick.custom,
             statePick.selection,
-            statePick.custom
+            statePick.custom,
+            profile.localPhotoFileName
         )
     }
 
@@ -180,15 +308,22 @@ struct ProfileSetupView: View {
         return (LocationOptions.writeMyOwn, trimmed)
     }
 
+    private var resolvedCountry: String {
+        if selectedCountry == LocationOptions.writeMyOwn {
+            return customCountry.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return selectedCountry
+    }
+
     private var resolvedCity: String {
-        if selectedCity == LocationOptions.writeMyOwn {
+        if !isUSA || selectedCity == LocationOptions.writeMyOwn {
             return customCity.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return selectedCity
     }
 
     private var resolvedState: String {
-        if selectedState == LocationOptions.writeMyOwn {
+        if !isUSA || selectedState == LocationOptions.writeMyOwn {
             return customState.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return selectedState

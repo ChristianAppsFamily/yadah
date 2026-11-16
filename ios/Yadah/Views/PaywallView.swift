@@ -32,7 +32,7 @@ struct PaywallView: View {
                         .padding(.top, 24)
 
                     VStack(spacing: 12) {
-                        PremiumFeatureRow(icon: "bell.badge.fill", text: "Up to 5 daily reminders")
+                        PremiumFeatureRow(icon: "bell.badge.fill", text: "Unlimited daily reminders")
                         PremiumFeatureRow(icon: "text.book.closed.fill", text: "Choose your own verses")
                         PremiumFeatureRow(icon: "paintpalette.fill", text: "Pro themes & Day mode extras")
                         PremiumFeatureRow(icon: "xmark.circle.fill", text: "No advertisements")

@@ -4,7 +4,7 @@ struct AmenView: View {
     @Environment(\.themePalette) private var theme
     let onComplete: () -> Void
     @State private var opacity: Double = 0
-    @State private var scale: Double = 0.7
+    @State private var scale: Double = 0.85
 
     var body: some View {
         ZStack {
@@ -18,18 +18,18 @@ struct AmenView: View {
         }
         .statusBarHidden()
         .onAppear {
-            withAnimation(.easeIn(duration: 0.5)) {
+            withAnimation(.easeInOut(duration: 0.75)) {
                 opacity = 1
                 scale = 1
             }
 
             Task {
-                try? await Task.sleep(for: .seconds(2.5))
-                withAnimation(.easeOut(duration: 0.6)) {
+                try? await Task.sleep(for: .seconds(2.6))
+                withAnimation(.easeInOut(duration: 0.85)) {
                     opacity = 0
-                    scale = 1.1
+                    scale = 1.05
                 }
-                try? await Task.sleep(for: .seconds(0.7))
+                try? await Task.sleep(for: .seconds(0.9))
                 onComplete()
             }
         }

@@ -12,6 +12,8 @@
 	<string>We use your permission to show ads that are more relevant to you.</string>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>Yadah sends gentle reminders to pause and give thanks to the Lord.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Yadah can use a photo from your library as an optional profile picture stored only on this device.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

@@ -38,7 +38,7 @@ struct HomeView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(theme.skyGradient)
+                    .background(theme.accent)
                     .clipShape(.capsule)
             }
             .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.showMoment)

@@ -2,7 +2,6 @@ import SwiftUI
 
 struct MomentView: View {
     @Environment(\.themePalette) private var theme
-    let scripture: Scripture
     let onComplete: () -> Void
     @State private var appeared = false
 
@@ -13,42 +12,32 @@ struct MomentView: View {
 
             VStack(spacing: 0) {
                 Text(AppConstants.displayName)
-                    .font(.system(.caption, design: .serif, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .padding(.top, 16)
+                    .font(.system(.title2, design: .serif, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.top, 20)
 
-                Spacer()
+                Spacer(minLength: 32)
 
-                VStack(spacing: 32) {
-                    Text("\"\(scripture.text)\"")
+                VStack(spacing: 20) {
+                    Text(instructionCopy)
                         .font(.system(.title3, design: .serif, weight: .regular))
-                        .italic()
+                        .foregroundStyle(.white.opacity(0.95))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(10)
+                        .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 12)
+
+                    Text("THANK YOU LORD!")
+                        .font(.system(.title3, design: .serif, weight: .semibold))
+                        .tracking(1.2)
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
-                        .lineSpacing(6)
                         .opacity(appeared ? 1 : 0)
-                        .offset(y: appeared ? 0 : 16)
-
-                    Text("— \(scripture.reference)")
-                        .font(.system(.subheadline, design: .serif, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .opacity(appeared ? 1 : 0)
-
-                    VStack(spacing: 6) {
-                        Text("Take a moment.")
-                            .font(.system(.callout, design: .default))
-                            .italic()
-                            .foregroundStyle(.white.opacity(0.7))
-                        Text("Breathe. Thank Him.")
-                            .font(.system(.callout, design: .default))
-                            .italic()
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .opacity(appeared ? 1 : 0)
+                        .offset(y: appeared ? 0 : 8)
                 }
                 .padding(.horizontal, 32)
 
-                Spacer()
+                Spacer(minLength: 32)
 
                 Button(action: onComplete) {
                     Text("In Jesus' Name")
@@ -60,16 +49,20 @@ struct MomentView: View {
                         .clipShape(.capsule)
                 }
                 .padding(.horizontal, 40)
-                .padding(.bottom, 48)
+                .padding(.bottom, 40)
                 .opacity(appeared ? 1 : 0)
-                .offset(y: appeared ? 0 : 20)
+                .offset(y: appeared ? 0 : 16)
             }
         }
         .statusBarHidden()
         .onAppear {
-            withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
+            withAnimation(.easeOut(duration: 1.0).delay(0.15)) {
                 appeared = true
             }
         }
+    }
+
+    private var instructionCopy: String {
+        MomentPrompt.forToday().body
     }
 }

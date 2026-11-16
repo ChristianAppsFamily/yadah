@@ -55,11 +55,11 @@ final class WallService {
     func postGiveThanks() async {
         guard let profile = storage.userProfile, profile.hasJoinedWall else { return }
 
-        let initials = String(profile.initials.prefix(4))
+        let displayName = String(profile.wallDisplayName.prefix(40))
         let city = Self.cityLabel(for: profile)
         let optimistic = WallEntry(
             id: UUID().uuidString,
-            initials: initials,
+            initials: displayName,
             city: city,
             timestamp: Date()
         )
@@ -74,7 +74,7 @@ final class WallService {
         communityTotal = max(communityTotal + 1, entries.count, storage.totalCount)
 
         do {
-            let saved = try await performInsert(initials: initials, city: city)
+            let saved = try await performInsert(initials: displayName, city: city)
             if let index = entries.firstIndex(where: { $0.id == optimistic.id }) {
                 entries[index] = saved
             } else {
@@ -89,13 +89,25 @@ final class WallService {
     }
 
     static func cityLabel(for profile: UserProfile) -> String {
-        if profile.city.isEmpty {
-            return "Somewhere"
+        let city = profile.city.trimmingCharacters(in: .whitespacesAndNewlines)
+        let state = profile.state.trimmingCharacters(in: .whitespacesAndNewlines)
+        let country = profile.country.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if city.isEmpty {
+            return country.isEmpty ? "Somewhere" : String(country.prefix(80))
         }
-        if profile.state.isEmpty {
-            return String(profile.city.prefix(80))
+
+        if profile.isUnitedStates {
+            if state.isEmpty {
+                return String(city.prefix(80))
+            }
+            return String("\(city), \(state)".prefix(80))
         }
-        return String("\(profile.city), \(profile.state)".prefix(80))
+
+        var parts = [city]
+        if !state.isEmpty { parts.append(state) }
+        if !country.isEmpty { parts.append(country) }
+        return String(parts.joined(separator: ", ").prefix(80))
     }
 
     // MARK: - Networking

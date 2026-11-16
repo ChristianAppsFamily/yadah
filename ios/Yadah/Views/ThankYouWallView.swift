@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ThankYouWallView: View {
     @Bindable var viewModel: AppViewModel
@@ -10,6 +11,14 @@ struct ThankYouWallView: View {
 
     private var thanksTotal: Int {
         viewModel.wallService.displayedThanksTotal
+    }
+
+    private var currentDisplayName: String? {
+        viewModel.storage.userProfile?.wallDisplayName
+    }
+
+    private var currentProfilePhoto: UIImage? {
+        ProfilePhotoStore.loadImage(fileName: viewModel.storage.userProfile?.localPhotoFileName)
     }
 
     var body: some View {
@@ -33,7 +42,10 @@ struct ThankYouWallView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(entries) { entry in
-                            WallEntryCard(entry: entry)
+                            WallEntryCard(
+                                entry: entry,
+                                profilePhoto: photo(for: entry)
+                            )
                         }
                     }
                     .padding(.horizontal, 24)
@@ -56,6 +68,14 @@ struct ThankYouWallView: View {
         .task {
             await viewModel.wallService.refresh()
         }
+    }
+
+    private func photo(for entry: WallEntry) -> UIImage? {
+        guard let currentDisplayName,
+              entry.initials.caseInsensitiveCompare(currentDisplayName) == .orderedSame else {
+            return nil
+        }
+        return currentProfilePhoto
     }
 
     private var thanksTotalLabel: String {
@@ -92,7 +112,7 @@ struct ThankYouWallView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(theme.skyGradient)
+                    .background(theme.accent)
                     .clipShape(.capsule)
             }
             .padding(.horizontal, 32)
@@ -126,20 +146,17 @@ struct ThankYouWallView: View {
 struct WallEntryCard: View {
     @Environment(\.themePalette) private var theme
     let entry: WallEntry
+    var profilePhoto: UIImage?
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(entry.initials)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(theme.navy)
-                .frame(width: 40, height: 40)
-                .background(theme.accentLight.opacity(0.55))
-                .clipShape(.circle)
+            avatar
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.initials)
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(theme.navy)
+                    .lineLimit(1)
 
                 Text(entry.city)
                     .font(.system(size: 13, weight: .regular, design: .rounded))
@@ -160,6 +177,30 @@ struct WallEntryCard: View {
                 .stroke(theme.lightBorder, lineWidth: 1)
         }
         .clipShape(.rect(cornerRadius: 14))
+    }
+
+    @ViewBuilder
+    private var avatar: some View {
+        if let profilePhoto {
+            Image(uiImage: profilePhoto)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 40, height: 40)
+                .clipShape(.circle)
+        } else {
+            Text(monogram(for: entry.initials))
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(theme.navy)
+                .frame(width: 40, height: 40)
+                .background(theme.accentLight.opacity(0.55))
+                .clipShape(.circle)
+        }
+    }
+
+    private func monogram(for label: String) -> String {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.count <= 3 { return trimmed.uppercased() }
+        return String(trimmed.prefix(1)).uppercased()
     }
 
     private func timeAgo(_ date: Date) -> String {
